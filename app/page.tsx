@@ -24,7 +24,7 @@ export default function Page() {
 
   const stats = [
     {
-      title: 'รถพยาบาลพร้อมใช้งาน',
+      title: 'ศูนย์อพยพทั้งหมด',
       value: '12',
       total: '15',
       icon: Ambulance,
@@ -32,7 +32,7 @@ export default function Page() {
       trend: '+2 จากเมื่อวาน',
     },
     {
-      title: 'ผู้ป่วยฉุกเฉิน',
+      title: 'ศูนย์พักพิงทั้งหมด',
       value: '8',
       total: 'รายวันนี้',
       icon: AlertCircle,
@@ -40,7 +40,7 @@ export default function Page() {
       trend: '-3 จากเมื่อวาน',
     },
     {
-      title: 'เจ้าหน้าที่ออกปฏิบัติการ',
+      title: 'เคำร้องด่วนทั้งหมด',
       value: '24',
       total: '32',
       icon: Users,
@@ -48,7 +48,7 @@ export default function Page() {
       trend: '75% พร้อมปฏิบัติการ',
     },
     {
-      title: 'เวลาตอบสนองเฉลี่ย',
+      title: 'สิ่งของที่ถูกขอมากที่สุด',
       value: '6.5',
       total: 'นาที',
       icon: Clock,
