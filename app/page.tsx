@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import {
   Activity,
   Ambulance,
+  Home,
   Users,
   AlertCircle,
   Phone,
@@ -27,7 +28,7 @@ export default function Page() {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
-
+  
   const stats = [
     {
       title: 'ศูนย์อพยพทั้งหมด',
@@ -41,7 +42,7 @@ export default function Page() {
       title: 'ศูนย์พักพิงทั้งหมด',
       value: '8',
       total: 'รายวันนี้',
-      icon: AlertCircle,
+      icon: Home,
       color: 'bg-red-500',
       trend: '-3 จากเมื่อวาน',
     },
