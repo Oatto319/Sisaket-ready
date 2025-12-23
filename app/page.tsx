@@ -106,7 +106,7 @@ export default function Page() {
               <Activity className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">ศูนย์การแพทย์ฉุกเฉิน</h1>
+              <h1 className="text-2xl font-bold text-white">SISAKET READY</h1>
               <p className="text-slate-300 text-sm">จังหวัดศรีสะเกษ</p>
             </div>
           </div>
