@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import {
   Activity,
   Ambulance,
+  Home,
   Users,
   AlertCircle,
   Phone,
@@ -54,34 +55,6 @@ export default function Page() {
     return () => clearInterval(timer);
   }, []);
 
-  // ===== Fetch Centers =====
-  useEffect(() => {
-    const fetchCenters = async () => {
-      try {
-        setCentersLoading(true);
-        setCentersError(null);
-
-        const response = await getCenters(page, 20, search, filterStatus);
-
-        if (response.success) {
-          setCenters(response.data);
-          setTotalPages(response.pagination.totalPages);
-        } else {
-          setCentersError(response.message);
-        }
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : 'Failed to fetch centers';
-        setCentersError(errorMsg);
-      } finally {
-        setCentersLoading(false);
-      }
-    };
-
-    if (activeTab === 'centers') {
-      fetchCenters();
-    }
-  }, [activeTab, page, search, filterStatus]);
-
   const stats = [
     {
       title: 'ศูนย์อพยพทั้งหมด',
@@ -95,7 +68,7 @@ export default function Page() {
       title: 'ศูนย์พักพิงทั้งหมด',
       value: '8',
       total: 'รายวันนี้',
-      icon: AlertCircle,
+      icon: Home,
       color: 'bg-red-500',
       trend: '-3 จากเมื่อวาน',
     },
@@ -160,7 +133,7 @@ export default function Page() {
               <Activity className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">ศูนย์การแพทย์ฉุกเฉิน</h1>
+              <h1 className="text-2xl font-bold text-white">SISAKET READY</h1>
               <p className="text-slate-300 text-sm">จังหวัดศรีสะเกษ</p>
             </div>
           </div>
