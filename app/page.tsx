@@ -3,224 +3,199 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import NotificationPanel from './components/NotificationPanel'; 
 import {
   Activity,
   Ambulance,
   Home,
   Users,
   AlertCircle,
-  Phone,
-  MapPin,
   Clock,
   TrendingUp,
-  Menu,
-  X,
   BarChart3,
-  Settings,
   Search,
-  ChevronRight
+  ChevronRight,
+  ClipboardList,
+  PackageMinus,
+  MapPin, 
+  Package,
+  FileText,
+  Trash2,
+  Eye,
+  X,
+  Phone,
+  User
 } from 'lucide-react';
 
 export default function Page() {
   const router = useRouter();
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  
+  // Data State
+  const [pendingCount, setPendingCount] = useState(0);
+  const [totalStock, setTotalStock] = useState(0);
+  const [recentRequests, setRecentRequests] = useState<any[]>([]);
+  
+  // Modal State
+  const [selectedRequest, setSelectedRequest] = useState<any>(null);
+
+  const loadData = () => {
+    try {
+        // Load Requests
+        const storedRequests = localStorage.getItem('ems_requests');
+        if (storedRequests) {
+            const requests = JSON.parse(storedRequests);
+            const pending = requests.filter((r: any) => r.status === 'PENDING').length;
+            setPendingCount(pending);
+            setRecentRequests(requests.slice(0, 10)); 
+        } else {
+            setPendingCount(0);
+            setRecentRequests([]);
+        }
+
+        // Load Inventory Total
+        const storedInv = localStorage.getItem('ems_inventory');
+        if (storedInv) {
+            const items = JSON.parse(storedInv);
+            const total = items.reduce((sum: number, item: any) => sum + item.stock, 0);
+            setTotalStock(total);
+        } else {
+            setTotalStock(0);
+        }
+    } catch (error) {
+        console.error("Data load error:", error);
+    }
+  };
 
   useEffect(() => {
     setCurrentTime(new Date());
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
+    loadData();
+    const dataTimer = setInterval(loadData, 1000);
+    window.addEventListener('storage', loadData);
+    return () => {
+        clearInterval(timer);
+        clearInterval(dataTimer);
+        window.removeEventListener('storage', loadData);
+    };
   }, []);
 
-  // --- ส่วนที่แก้ไข: ปรับลำดับและข้อมูลใน stats ---
-  const stats = [
-    {
-      // 1. ย้ายมาอยู่อันดับแรก
-      title: 'ศูนย์พักพิงทั้งหมด',
-      value: '15', // แสดงจำนวนตัวเลข
-      total: 'แห่ง',
-      unit: '',
-      icon: MapPin,
-      color: 'text-blue-400',
-      bg: 'bg-blue-500/10',
-      border: 'border-blue-500/20 group-hover:border-blue-400 group-hover:bg-blue-500/10', // เพิ่ม Hover effect
-      trend: 'กดเพื่อดูรายชื่อ', // ข้อความด้านล่าง
-      trendUp: true,
-      href: '/cards/shelter' // ลิงก์ไปหน้า Shelter
-    },
-    {
-      title: 'ศูนย์อพยพ (เปิด)',
-      value: '12',
-      total: '15',
-      unit: 'แห่ง',
-      icon: Home,
-      color: 'text-emerald-400',
-      bg: 'bg-emerald-500/10',
-      border: 'border-emerald-500/20',
-      trend: '+2 เปิดเพิ่ม',
-      trendUp: true,
-      href: null
-    },
-    {
-      title: 'ผู้ประสบภัยรวม',
-      value: '1,240',
-      total: 'ราย',
-      unit: 'คน',
-      icon: Users,
-      color: 'text-orange-400',
-      bg: 'bg-orange-500/10',
-      border: 'border-orange-500/20',
-      trend: '-15% จากเมื่อวาน',
-      trendUp: false,
-      href: null
-    },
-    {
-      title: 'เวลาตอบสนอง',
-      value: '6.5',
-      total: 'นาที',
-      unit: 'เฉลี่ย',
-      icon: Clock,
-      color: 'text-purple-400',
-      bg: 'bg-purple-500/10',
-      border: 'border-purple-500/20',
-      trend: 'เร็วขึ้น 1.2 นาที',
-      trendUp: true,
-      href: null
-    },
-  ];
+  const getItemIcon = (itemName: string) => {
+    if (itemName.includes('น้ำ')) return '💧';
+    if (itemName.includes('ข้าว')) return '🌾';
+    if (itemName.includes('บะหมี่')) return '🍜';
+    if (itemName.includes('ปลา')) return '🐟';
+    if (itemName.includes('ยา')) return '💊';
+    if (itemName.includes('ผ้าห่ม')) return '🧣';
+    if (itemName.includes('เต็นท์')) return '⛺';
+    if (itemName.includes('ไฟฉาย')) return '🔦';
+    return '📦';
+  };
 
-  const emergencyCases = [
-    { id: 1, time: '14:32', location: 'ถ.ศรีสะเกษ ซอย 5', type: 'อุบัติเหตุ', status: 'กำลังดำเนินการ', priority: 'high' },
-    { id: 2, time: '14:15', location: 'ม.ราชภัฏศรีสะเกษ', type: 'ผู้ป่วยหัวใจ', status: 'กำลังดำเนินการ', priority: 'critical' },
-    { id: 3, time: '13:58', location: 'ตลาดกลาง', type: 'หมดสติ', status: 'รับผู้ป่วยแล้ว', priority: 'medium' },
-  ];
+  const handleCancelRequest = (id: any) => {
+    if(!confirm('ยืนยันการยกเลิกคำร้องขอนี้?')) return;
 
-  const ambulanceStatus = [
-    { id: 'A01', status: 'ว่าง', location: 'ฐานหลัก', driver: 'สมชาย ใจดี', battery: 95 },
-    { id: 'A02', status: 'ปฏิบัติการ', location: 'ถ.ขุขันธ์', driver: 'วิชัย รักษ์ดี', battery: 82 },
-  ];
+    const target = recentRequests.find(r => r.id === id);
+    if (!target) return;
 
-  const menuItems = [
-    { icon: Activity, label: 'ภาพรวมสถานการณ์', id: 'overview' },
-    { icon: AlertCircle, label: 'แจ้งเหตุฉุกเฉิน', id: 'cases' },
-    { icon: Ambulance, label: 'จัดการรถพยาบาล', id: 'ambulances' },
-    { icon: Users, label: 'เจ้าหน้าที่เวร', id: 'staff' },
-    { icon: BarChart3, label: 'รายงานสถิติ', id: 'reports' },
-  ];
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'critical': return 'text-red-500 bg-red-500/10 border-red-500/20';
-      case 'high': return 'text-orange-500 bg-orange-500/10 border-orange-500/20';
-      case 'medium': return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
-      default: return 'text-slate-400 bg-slate-500/10 border-slate-500/20';
+    if (target.status === 'PENDING') {
+        const storedInv = localStorage.getItem('ems_inventory');
+        if (storedInv) {
+            const inventory = JSON.parse(storedInv);
+            const itemIndex = inventory.findIndex((i: any) => i.id === target.itemId || i.name === target.item);
+            if (itemIndex !== -1) {
+                inventory[itemIndex].stock += target.quantity;
+                localStorage.setItem('ems_inventory', JSON.stringify(inventory));
+            }
+        }
     }
+
+    const allRequests = JSON.parse(localStorage.getItem('ems_requests') || '[]');
+    const newAllRequests = allRequests.filter((r: any) => r.id !== id);
+    localStorage.setItem('ems_requests', JSON.stringify(newAllRequests));
+    
+    loadData();
+    window.dispatchEvent(new Event('storage'));
+    setSelectedRequest(null);
   };
 
   const getStatusBadge = (status: string) => {
-    if (status === 'ว่าง') return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-    if (status === 'ปฏิบัติการ') return 'bg-red-500/20 text-red-400 border-red-500/30 animate-pulse';
-    return 'bg-slate-700 text-slate-300';
+    switch (status) {
+      case 'PENDING': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+      case 'APPROVED': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+      case 'REJECTED': return 'bg-red-500/20 text-red-400 border-red-500/30';
+      default: return 'bg-slate-700 text-slate-300';
+    }
   };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'PENDING': return 'รอการอนุมัติ';
+      case 'APPROVED': return 'อนุมัติแล้ว';
+      case 'REJECTED': return 'ถูกปฏิเสธ';
+      default: return status;
+    }
+  };
+
+  const stats = [
+    { title: 'ศูนย์พักพิงทั้งหมด', value: '15', total: 'แห่ง', unit: '', icon: MapPin, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20 group-hover:border-blue-400 group-hover:bg-blue-500/10', trend: 'กดเพื่อดูรายชื่อ', trendUp: true, href: '/cards/shelter' },
+    { title: 'คำร้องขอ (รออนุมัติ)', value: pendingCount.toString(), total: 'รายการ', unit: '', icon: ClipboardList, color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20 group-hover:border-orange-400 group-hover:bg-orange-500/10', trend: 'รอการจัดการ', trendUp: pendingCount > 0, href: '/cards/request' },
+    { title: 'เบิกจ่ายสิ่งของ', value: 'สร้างใบเบิก', total: 'ใหม่', unit: '', icon: PackageMinus, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20 group-hover:border-emerald-400 group-hover:bg-emerald-500/10', trend: 'คลังหลักพร้อมจ่าย', trendUp: true, href: '/cards/requisition' },
+    { title: 'คลังสินค้าทั้งหมด', value: totalStock.toLocaleString(), total: 'ชิ้น', unit: '', icon: Package, color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20 group-hover:border-purple-400 group-hover:bg-purple-500/10', trend: 'ตรวจสอบสต๊อก', trendUp: true, href: '/cards/inventory' },
+  ];
 
   return (
     <div className="min-h-screen bg-[#0B1120] text-slate-100 font-sans selection:bg-blue-500/30">
-      {/* Background Ambient Glow */}
       <div className="fixed inset-0 z-0 pointer-events-none">
          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/20 rounded-full blur-[120px]" />
          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 rounded-full blur-[120px]" />
       </div>
 
-      <div className="relative z-10 flex h-screen overflow-hidden">
-        {/* Sidebar */}
-        <aside
-          className={`${
-            sidebarOpen ? 'w-72' : 'w-20'
-          } transition-all duration-300 ease-in-out bg-slate-900/60 backdrop-blur-xl border-r border-slate-800 flex flex-col shadow-2xl`}
-        >
-          {/* Logo Area */}
-          <div className="h-20 flex items-center px-6 border-b border-slate-800/60">
-            <div className="flex items-center gap-3 overflow-hidden">
-              <div className="min-w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-                <Activity className="w-6 h-6 text-white" />
-              </div>
-              <div className={`transition-opacity duration-300 ${!sidebarOpen && 'opacity-0 hidden'}`}>
-                <h1 className="font-bold text-lg tracking-tight text-white leading-none">SISAKET<br/><span className="text-blue-400 text-sm font-medium">READY SYSTEM</span></h1>
-              </div>
-            </div>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto custom-scrollbar">
-            {menuItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-3.5 rounded-xl transition-all duration-200 group relative ${
-                  activeTab === item.id
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'
-                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-100'
-                }`}
-              >
-                <item.icon className={`w-5 h-5 flex-shrink-0 transition-transform ${activeTab === item.id ? 'scale-110' : 'group-hover:scale-110'}`} />
-                <span className={`whitespace-nowrap font-medium transition-all duration-300 ${!sidebarOpen && 'opacity-0 w-0 hidden'}`}>
-                  {item.label}
-                </span>
-              </button>
-            ))}
-          </nav>
-
-          {/* Sidebar Footer */}
-          <div className="p-3 border-t border-slate-800/60 space-y-1">
-             <button className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-400 hover:bg-slate-800/50 hover:text-white transition-colors ${!sidebarOpen ? 'justify-center' : ''}`}>
-               <Settings className="w-5 h-5" />
-               <span className={`${!sidebarOpen && 'hidden'}`}>ตั้งค่าระบบ</span>
-             </button>
-          </div>
-        </aside>
-
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col h-screen overflow-hidden bg-transparent">
-          
-          {/* Header */}
-          <header className="h-20 flex items-center justify-between px-8 bg-slate-900/40 backdrop-blur-md border-b border-slate-800/60 sticky top-0 z-20">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
-              >
-                {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-              </button>
-              
-              {/* Search Bar */}
-              <div className="hidden md:flex items-center gap-3 bg-slate-800/50 px-4 py-2 rounded-full border border-slate-700/50 focus-within:border-blue-500/50 focus-within:bg-slate-800 transition-all w-64 lg:w-96">
-                <Search className="w-4 h-4 text-slate-400" />
-                <input 
-                  type="text" 
-                  placeholder="ค้นหา..." 
-                  className="bg-transparent border-none outline-none text-sm text-slate-200 placeholder-slate-500 w-full"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-6">
-              <div className="text-right hidden sm:block">
-                <p className="text-xl font-mono font-bold text-white tabular-nums leading-none mt-1">
-                  {currentTime ? currentTime.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
-                </p>
-              </div>
-              <div className="h-8 w-[1px] bg-slate-700 hidden sm:block"></div>
-              <div className="flex items-center gap-3 pl-2">
-                <div className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center">
-                   <Users className="w-5 h-5 text-slate-300" />
+      <div className="relative z-10 flex flex-col h-screen overflow-hidden">
+        
+        {/* --- Header (ย้าย Logo มาไว้ที่นี่) --- */}
+        <header className="h-20 flex items-center justify-between px-8 bg-slate-900/40 backdrop-blur-md border-b border-slate-800/60 sticky top-0 z-20">
+            {/* Left Side: Logo & Search */}
+            <div className="flex items-center gap-8">
+                {/* Logo & Name */}
+                <div className="flex items-center gap-3">
+                    <div className="min-w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                        <Activity className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                        <h1 className="font-bold text-lg tracking-tight text-white leading-none">SISAKET<br/><span className="text-blue-400 text-sm font-medium">READY SYSTEM</span></h1>
+                    </div>
                 </div>
-              </div>
-            </div>
-          </header>
 
-          {/* Dashboard Content */}
-          <main className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth custom-scrollbar">
+                {/* Search Bar */}
+                <div className="hidden md:flex items-center gap-3 bg-slate-800/50 px-4 py-2 rounded-full border border-slate-700/50 focus-within:border-blue-500/50 focus-within:bg-slate-800 transition-all w-64 lg:w-96">
+                    <Search className="w-4 h-4 text-slate-400" />
+                    <input 
+                        type="text" 
+                        placeholder="ค้นหาระบบ..." 
+                        className="bg-transparent border-none outline-none text-sm text-slate-200 placeholder-slate-500 w-full"
+                    />
+                </div>
+            </div>
+
+            {/* Right Side: Time & Profile */}
+            <div className="flex items-center gap-6">
+                <div className="text-right hidden sm:block">
+                    <p className="text-xl font-mono font-bold text-white tabular-nums leading-none mt-1">
+                        {currentTime ? currentTime.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                    </p>
+                </div>
+                <div className="h-8 w-[1px] bg-slate-700 hidden sm:block"></div>
+                <div className="flex items-center gap-3 pl-2">
+                    <div className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center">
+                        <Users className="w-5 h-5 text-slate-300" />
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        {/* --- Main Content (Full Width) --- */}
+        <main className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth custom-scrollbar">
             <div className="max-w-7xl mx-auto space-y-8">
               
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -233,7 +208,6 @@ export default function Page() {
               {/* Stats Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
                 {stats.map((stat, i) => {
-                  // สร้างเนื้อหาภายใน Card
                   const CardContent = () => (
                     <>
                       <div className="absolute top-0 right-0 p-4 opacity-50">
@@ -248,12 +222,10 @@ export default function Page() {
                       </div>
                       
                       <div className="flex items-baseline gap-2">
-                        {/* แสดงตัวเลขเสมอ */}
                         <h3 className="text-3xl font-bold text-white font-mono">{stat.value}</h3>
                         <span className="text-slate-500 text-sm">{stat.unit ? `/ ${stat.total} ${stat.unit}` : stat.total}</span>
                       </div>
                       
-                      {/* ส่วนล่างของ Card: ถ้ามี href (เป็น Link) ให้แสดงปุ่มกด */}
                       <div className={`mt-4 flex items-center gap-2 text-xs font-medium ${stat.href ? 'text-blue-400' : (stat.trendUp ? 'text-emerald-400' : 'text-rose-400')}`}>
                         {stat.href ? (
                           <div className="flex items-center gap-1 group-hover:translate-x-1 transition-transform">
@@ -272,7 +244,6 @@ export default function Page() {
 
                   const cardClasses = `relative group overflow-hidden rounded-2xl border ${stat.border} bg-slate-900/40 backdrop-blur-sm p-6 transition-all duration-300 ${stat.href ? 'cursor-pointer hover:bg-slate-800/60' : ''}`;
 
-                  // ตรวจสอบว่ามี href หรือไม่ เพื่อเลือกใช้ Link หรือ div
                   if (stat.href) {
                     return (
                       <Link href={stat.href} key={i} className={cardClasses}>
@@ -289,55 +260,212 @@ export default function Page() {
                 })}
               </div>
 
-              {/* Table Section */}
+              {/* Layout Content */}
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                 {/* Emergency Cases */}
-                 <div className="xl:col-span-2 rounded-2xl border border-slate-700/50 bg-slate-900/60 backdrop-blur-md overflow-hidden flex flex-col">
-                  <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
+                 
+                 {/* Table: สถานะการเบิกจ่าย */}
+                 <div className="xl:col-span-2 rounded-2xl border border-slate-700/50 bg-slate-900/60 backdrop-blur-md overflow-hidden flex flex-col min-h-[400px]">
+                  <div className="p-6 border-b border-slate-700/50 flex items-center justify-between bg-slate-800/40">
                     <h3 className="font-semibold text-lg text-white flex items-center gap-2">
-                      <AlertCircle className="w-5 h-5 text-red-500" />
-                      แจ้งเหตุฉุกเฉินล่าสุด
+                      <FileText className="w-5 h-5 text-emerald-400" />
+                      สถานะการเบิกจ่ายล่าสุด
                     </h3>
+                    <Link href="/cards/request" className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1">
+                       ดูทั้งหมด <ChevronRight className="w-4 h-4" />
+                    </Link>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto flex-1">
                     <table className="w-full text-left text-sm text-slate-400">
                       <thead className="bg-slate-900/80 text-xs uppercase font-medium text-slate-300">
                         <tr>
-                           <th className="px-6 py-4">ความเร่งด่วน</th>
-                           <th className="px-6 py-4">สถานที่</th>
                            <th className="px-6 py-4">สถานะ</th>
+                           <th className="px-6 py-4">สถานที่ / ผู้เบิก</th>
+                           <th className="px-6 py-4">รายการ</th>
+                           <th className="px-6 py-4 text-right">จัดการ</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/60">
-                        {emergencyCases.map((item) => (
-                          <tr key={item.id} className="hover:bg-slate-800/30">
-                            <td className="px-6 py-4">
-                               <span className={`px-2 py-1 rounded text-xs ${getPriorityColor(item.priority)}`}>{item.priority}</span>
-                            </td>
-                            <td className="px-6 py-4 text-white">{item.location}</td>
-                            <td className="px-6 py-4 text-emerald-400">{item.status}</td>
-                          </tr>
-                        ))}
+                        {recentRequests.length === 0 ? (
+                            <tr>
+                                <td colSpan={4} className="text-center py-10 text-slate-500">ไม่มีรายการเบิกจ่ายล่าสุด</td>
+                            </tr>
+                        ) : (
+                            recentRequests.map((item) => (
+                            <tr 
+                                key={item.id} 
+                                onClick={() => setSelectedRequest(item)}
+                                className="hover:bg-slate-800/30 transition-colors cursor-pointer group"
+                            >
+                                <td className="px-6 py-4">
+                                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold border ${getStatusBadge(item.status)}`}>
+                                    {getStatusLabel(item.status)}
+                                </span>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <div className="text-white font-medium group-hover:text-blue-400 transition-colors">{item.requester}</div>
+                                    <div className="text-xs text-slate-500 flex items-center gap-1"><MapPin className="w-3 h-3" /> {item.location}</div>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <div className="text-white flex items-center gap-2">
+                                        <span className="text-lg">{getItemIcon(item.item)}</span>
+                                        {item.item}
+                                    </div>
+                                    <div className="text-xs text-slate-500">จำนวน: {item.quantity} {item.unit}</div>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                        <button className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors">
+                                            <Eye className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); handleCancelRequest(item.id); }}
+                                            className="p-2 hover:bg-red-900/30 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
+                                            title="ยกเลิกรายการ"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            ))
+                        )}
                       </tbody>
                     </table>
                   </div>
                  </div>
 
-                 {/* Ambulance Status */}
-                 <div className="rounded-2xl border border-slate-700/50 bg-slate-900/60 backdrop-blur-md p-6">
-                    <h3 className="text-white font-semibold mb-4">รถพยาบาลพร้อมใช้</h3>
-                    {ambulanceStatus.map(amb => (
-                      <div key={amb.id} className="flex justify-between items-center mb-3 p-3 bg-slate-800/50 rounded-lg">
-                        <span className="text-white">{amb.id}</span>
-                        <span className={`text-xs px-2 py-1 rounded ${getStatusBadge(amb.status)}`}>{amb.status}</span>
-                      </div>
-                    ))}
-                 </div>
+                 {/* Notifications */}
+                 <NotificationPanel />
+
               </div>
             </div>
-          </main>
-        </div>
+        </main>
       </div>
+
+      {/* --- DETAIL MODAL --- */}
+      {selectedRequest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+                
+                {/* Header Image Area */}
+                <div className={`h-32 bg-gradient-to-br flex items-center justify-center relative ${selectedRequest.status === 'PENDING' ? 'from-yellow-600/20 to-orange-600/20' : selectedRequest.status === 'APPROVED' ? 'from-emerald-600/20 to-teal-600/20' : 'from-red-600/20 to-rose-600/20'}`}>
+                    <div className="text-6xl drop-shadow-lg filter">{getItemIcon(selectedRequest.item)}</div>
+                    <button 
+                        onClick={() => setSelectedRequest(null)}
+                        className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 rounded-full text-white transition-colors"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                    <div className="absolute bottom-4 left-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold border backdrop-blur-md ${getStatusBadge(selectedRequest.status)}`}>
+                            {getStatusLabel(selectedRequest.status)}
+                        </span>
+                    </div>
+                </div>
+
+                {/* Content */}
+                <div className="p-6 overflow-y-auto custom-scrollbar">
+                    
+                    {/* Item Details */}
+                    <div className="mb-6">
+                        <h3 className="text-2xl font-bold text-white mb-1">{selectedRequest.item}</h3>
+                        <p className="text-slate-400 text-sm flex items-center gap-2">
+                            <span>รหัสคำร้อง: #{String(selectedRequest.id).slice(-6)}</span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {selectedRequest.time}</span>
+                        </p>
+                    </div>
+
+                    {/* Quantity Card */}
+                    <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-6 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300">
+                                <Package className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-slate-400">จำนวนที่ขอเบิก</p>
+                                <p className="text-white font-medium">{selectedRequest.quantity} {selectedRequest.unit}</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-xs text-slate-400">ความเร่งด่วน</p>
+                            <p className={`font-bold ${selectedRequest.urgency === 'CRITICAL' ? 'text-red-400' : 'text-emerald-400'}`}>
+                                {selectedRequest.urgency || 'NORMAL'}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Timeline */}
+                    <div className="mb-6">
+                        <h4 className="text-sm font-semibold text-slate-300 mb-4">สถานะการดำเนินการ</h4>
+                        <div className="relative pl-4 border-l-2 border-slate-700 space-y-6">
+                            <div className="relative">
+                                <div className="absolute -left-[21px] top-0 w-3 h-3 rounded-full bg-emerald-500 ring-4 ring-slate-900" />
+                                <p className="text-sm text-white font-medium">ส่งคำร้องขอแล้ว</p>
+                                <p className="text-xs text-slate-500">ระบบได้รับข้อมูลเรียบร้อย</p>
+                            </div>
+                            <div className="relative">
+                                <div className={`absolute -left-[21px] top-0 w-3 h-3 rounded-full ring-4 ring-slate-900 ${selectedRequest.status !== 'PENDING' ? (selectedRequest.status === 'REJECTED' ? 'bg-red-500' : 'bg-emerald-500') : 'bg-slate-600'}`} />
+                                <p className={`text-sm font-medium ${selectedRequest.status === 'PENDING' ? 'text-slate-500' : 'text-white'}`}>
+                                    {selectedRequest.status === 'REJECTED' ? 'คำร้องถูกปฏิเสธ' : 'อนุมัติการเบิกจ่าย'}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                    {selectedRequest.status === 'PENDING' ? 'รอเจ้าหน้าที่ตรวจสอบ' : (selectedRequest.status === 'REJECTED' ? 'สต๊อกสินค้าคืนสู่คลัง' : 'เจ้าหน้าที่อนุมัติแล้ว')}
+                                </p>
+                            </div>
+                            <div className="relative">
+                                <div className={`absolute -left-[21px] top-0 w-3 h-3 rounded-full ring-4 ring-slate-900 ${selectedRequest.status === 'COMPLETED' ? 'bg-emerald-500' : 'bg-slate-600'}`} />
+                                <p className={`text-sm font-medium ${selectedRequest.status === 'COMPLETED' ? 'text-white' : 'text-slate-500'}`}>จัดส่ง/รับของแล้ว</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Requester Info */}
+                    <div>
+                        <h4 className="text-sm font-semibold text-slate-300 mb-3">ข้อมูลผู้เบิก/จัดส่ง</h4>
+                        <div className="bg-slate-800/30 rounded-xl p-4 space-y-3">
+                            <div className="flex items-start gap-3">
+                                <MapPin className="w-5 h-5 text-blue-400 mt-0.5" />
+                                <div>
+                                    <p className="text-sm text-white">{selectedRequest.requester}</p>
+                                    <p className="text-xs text-slate-500">{selectedRequest.location}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <User className="w-5 h-5 text-slate-400" />
+                                <p className="text-sm text-slate-300">เจ้าหน้าที่ประจำศูนย์</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <Phone className="w-5 h-5 text-slate-400" />
+                                <p className="text-sm text-slate-300">045-XXX-XXX</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer Actions */}
+                <div className="p-4 border-t border-slate-800 bg-slate-800/50 flex gap-3">
+                    {selectedRequest.status === 'PENDING' ? (
+                        <button 
+                            onClick={() => handleCancelRequest(selectedRequest.id)}
+                            className="flex-1 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-bold transition-colors flex items-center justify-center gap-2"
+                        >
+                            <Trash2 className="w-4 h-4" /> ยกเลิกคำสั่ง
+                        </button>
+                    ) : (
+                        <button 
+                            onClick={() => setSelectedRequest(null)}
+                            className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold transition-colors"
+                        >
+                            ปิดหน้าต่าง
+                        </button>
+                    )}
+                </div>
+
+            </div>
+        </div>
+      )}
+
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
