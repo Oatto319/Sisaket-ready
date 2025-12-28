@@ -1,69 +1,54 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react'; // 1. Import hook เพิ่ม
 import {
   ArrowLeft,
   MapPin,
   Phone,
   Navigation,
-  Users,
   Building2
 } from 'lucide-react';
+
+// (Optional) กำหนด Type ของข้อมูลเพื่อให้เรียกใช้ง่ายขึ้น
+interface Shelter {
+  id: string | number;
+  name: string;
+  district: string;
+  capacity: number;
+  occupied: number;
+  status: string;
+  phone: string;
+}
 
 export default function ShelterPage() {
   const router = useRouter();
 
-  // Mock Data
-  const shelters = [
-    {
-      id: 1,
-      name: 'โรงเรียนสตรีสิริเกศ',
-      district: 'เมืองศรีสะเกษ',
-      capacity: 500,
-      occupied: 420,
-      status: 'OPEN',
-      phone: '045-612-345',
-    },
-    {
-      id: 2,
-      name: 'อาคารเฉลิมพระเกียรติฯ',
-      district: 'กันทรลักษ์',
-      capacity: 1000,
-      occupied: 150,
-      status: 'OPEN',
-      phone: '045-899-123',
-    },
-    {
-      id: 3,
-      name: 'วัดมหาพุทธาราม',
-      district: 'เมืองศรีสะเกษ',
-      capacity: 200,
-      occupied: 198,
-      status: 'FULL',
-      phone: '081-234-5678',
-    },
-    {
-      id: 4,
-      name: 'อบต. หญ้าปล้อง',
-      district: 'เมืองศรีสะเกษ',
-      capacity: 300,
-      occupied: 0,
-      status: 'STANDBY',
-      phone: '045-111-222',
-    },
-    {
-      id: 5,
-      name: 'โรงเรียนขุขันธ์',
-      district: 'ขุขันธ์',
-      capacity: 400,
-      occupied: 350,
-      status: 'OPEN',
-      phone: '045-999-888',
-    },
-  ];
+  // 2. เปลี่ยนจาก Mock Data เป็น State
+  const [shelters, setShelters] = useState<Shelter[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // 3. ใช้ useEffect ดึงข้อมูลจาก API ที่เราสร้างไว้
+  useEffect(() => {
+    const fetchShelters = async () => {
+      try {
+        const response = await fetch('/api/centers'); // ยิงไปที่ API Route
+        if (!response.ok) throw new Error('Network response was not ok');
+        const data = await response.json();
+        setShelters(data);
+      } catch (error) {
+        console.error("Failed to fetch shelters:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchShelters();
+  }, []);
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    // API อาจส่งมาเป็น OPEN/FULL หรือตัวพิมพ์เล็ก ก็ปรับ case ตามต้องการ
+    switch (status?.toUpperCase()) {
       case 'OPEN': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
       case 'FULL': return 'text-red-400 bg-red-500/10 border-red-500/20';
       default: return 'text-slate-400 bg-slate-500/10 border-slate-500/20';
@@ -71,12 +56,24 @@ export default function ShelterPage() {
   };
 
   const getStatusLabel = (status: string) => {
-    switch (status) {
+    switch (status?.toUpperCase()) {
       case 'OPEN': return 'เปิดรับ';
       case 'FULL': return 'เต็ม';
       default: return 'สำรอง';
     }
   };
+
+  // 4. แสดงหน้า Loading ระหว่างรอข้อมูล
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0B1120] flex items-center justify-center text-slate-400">
+        <div className="flex flex-col items-center gap-2">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <p>กำลังโหลดข้อมูล...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0B1120] text-slate-100 font-sans">
@@ -98,14 +95,16 @@ export default function ShelterPage() {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-white tracking-tight">รายชื่อศูนย์พักพิง</h1>
-            <p className="text-sm text-slate-400">จังหวัดศรีสะเกษ</p>
+            <p className="text-sm text-slate-400">จังหวัดศรีสะเกษ ({shelters.length} แห่ง)</p>
           </div>
         </div>
 
         {/* List View */}
         <div className="space-y-3">
           {shelters.map((shelter) => {
-             const percent = Math.round((shelter.occupied / shelter.capacity) * 100);
+             // คำนวณเปอร์เซ็นต์ (ป้องกันการหารด้วย 0)
+             const safeCapacity = shelter.capacity || 1; 
+             const percent = Math.round((shelter.occupied / safeCapacity) * 100);
              
              return (
               <div 
@@ -123,7 +122,7 @@ export default function ShelterPage() {
                     </h3>
                     <div className="flex items-center gap-4 text-sm text-slate-400 mt-1">
                       <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {shelter.district}</span>
-                      <span className="hidden sm:flex items-center gap-1"><Building2 className="w-3.5 h-3.5" /> ความจุ {shelter.capacity}</span>
+                      <span className="hidden sm:flex items-center gap-1"><Building2 className="w-3.5 h-3.5" /> ความจุ {shelter.capacity || '-'}</span>
                     </div>
                   </div>
                 </div>
@@ -146,9 +145,13 @@ export default function ShelterPage() {
 
                   {/* Action Buttons */}
                   <div className="flex gap-2">
-                    <button className="p-2 rounded-lg bg-slate-800 hover:bg-blue-600 hover:text-white text-slate-400 transition-colors border border-slate-700 hover:border-blue-500">
+                    {/* ปุ่มโทร: ใส่ href tel: เพื่อให้กดโทรได้จริง */}
+                    <a 
+                      href={`tel:${shelter.phone}`}
+                      className="p-2 rounded-lg bg-slate-800 hover:bg-blue-600 hover:text-white text-slate-400 transition-colors border border-slate-700 hover:border-blue-500 flex items-center justify-center"
+                    >
                       <Phone className="w-4 h-4" />
-                    </button>
+                    </a>
                     <button className="p-2 rounded-lg bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-400 transition-colors border border-slate-700 hover:border-emerald-500">
                       <Navigation className="w-4 h-4" />
                     </button>
