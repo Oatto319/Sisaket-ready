@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import * as XLSX from 'xlsx';
 import {
   ArrowLeft,
   Search,
@@ -10,25 +11,26 @@ import {
   MapPin,
   ChevronRight,
   ShoppingCart,
-  Plus,
-  Minus,
-  AlertCircle,
   FileText,
-  Edit2,
   Trash2,
   CheckCircle2,
-  X,
-  ListChecks,
   XCircle,
-  Filter
+  FileSpreadsheet,
+  CloudUpload,
+  Settings2,
+  PlusCircle,
+  AlertCircle,
+  ListChecks
 } from 'lucide-react';
 
 export default function RequisitionPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showSelectedList, setShowSelectedList] = useState(false);
   const [activeCategory, setActiveCategory] = useState('ทั้งหมด');
+  
+  const [uploadMode, setUploadMode] = useState(false); 
+  const [excelPreview, setExcelPreview] = useState<any[]>([]); 
   
   const [selectedShelters, setSelectedShelters] = useState<number[]>([]);
   const [cart, setCart] = useState<{ [key: number]: number }>({});
@@ -63,26 +65,53 @@ export default function RequisitionPage() {
      }
   }, []);
 
-  const toggleShelter = (id: number) => {
-    setSelectedShelters(prev => 
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
+  const processExcel = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target?.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const data: any[] = XLSX.utils.sheet_to_json(ws);
+      const previewItems: any[] = [];
+      data.forEach((row) => {
+        const itemName = row['รายการ'] || row['item'];
+        const quantity = parseInt(row['จำนวน'] || row['quantity']);
+        const itemInInv = inventory.find(i => i.name === itemName);
+        if (itemInInv && !isNaN(quantity)) {
+          previewItems.push({ ...itemInInv, requestQty: quantity });
+        }
+      });
+      setExcelPreview(previewItems);
+    };
+    reader.readAsBinaryString(file);
   };
 
-  const clearAllSelected = () => {
-    if(confirm('ต้องการล้างสถานที่ที่เลือกทั้งหมดหรือไม่?')) {
-      setSelectedShelters([]);
-      setShowSelectedList(false);
-    }
+  const importToCart = () => {
+    const newCart = { ...cart };
+    excelPreview.forEach(item => {
+      const safeQty = Math.max(0, Math.min(item.limit, Math.min(item.stock, item.requestQty)));
+      if (safeQty > 0) {
+        newCart[item.id] = (newCart[item.id] || 0) + safeQty;
+      }
+    });
+    setCart(newCart);
+    setExcelPreview([]);
+    setUploadMode(false);
+    alert('นำเข้าข้อมูลเรียบร้อยแล้ว');
   };
 
-  // ฟังก์ชันใหม่สำหรับการพิมพ์จำนวน
+  const downloadSampleExcel = () => {
+    const sampleData = [{ 'รายการ': 'น้ำดื่ม (แพ็ค)', 'จำนวน': 10 }, { 'รายการ': 'ผ้าห่ม', 'จำนวน': 5 }];
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Sample");
+    XLSX.writeFile(workbook, "Sample_Requisition.xlsx");
+  };
+
   const handleInputChange = (itemId: number, value: string, limit: number, stock: number) => {
     const numValue = value === '' ? 0 : parseInt(value);
     if (isNaN(numValue)) return;
-
     const safeValue = Math.max(0, Math.min(limit, Math.min(stock, numValue)));
-    
     setCart(prev => {
       if (safeValue === 0) {
         const { [itemId]: _, ...rest } = prev;
@@ -92,18 +121,29 @@ export default function RequisitionPage() {
     });
   };
 
-  const handleCancel = () => {
-    if(confirm('ต้องการยกเลิกการเบิกจ่ายทั้งหมดหรือไม่?')) {
-        setSelectedShelters([]);
-        setCart({});
-        setStep(1);
-    }
+  const removeItem = (id: number) => {
+    setCart(prev => {
+      const { [id]: _, ...rest } = prev;
+      return rest;
+    });
   };
 
   const handleSubmit = () => {
     const newRequests: any[] = [];
-    const updatedInventory = [...inventory];
-    
+    let updatedInventory = [...inventory];
+    const shelterCount = selectedShelters.length;
+
+    // ตรวจสอบสต็อกรวมก่อนว่าพอจ่ายให้ทุกที่หรือไม่
+    for (const [itemId, qty] of Object.entries(cart)) {
+        const totalNeeded = Number(qty) * shelterCount;
+        const item = updatedInventory.find(i => i.id === Number(itemId));
+        if (item && item.stock < totalNeeded) {
+            alert(`สินค้า "${item.name}" มีสต็อกไม่เพียงพอสำหรับ ${shelterCount} ศูนย์ (ต้องการ ${totalNeeded} แต่มี ${item.stock})`);
+            return;
+        }
+    }
+
+    // ทำรายการตัดสต็อกจริง
     selectedShelters.forEach(shelterId => {
        const shelter = shelters.find(s => s.id === shelterId);
        Object.entries(cart).forEach(([itemId, qty]) => {
@@ -123,211 +163,229 @@ export default function RequisitionPage() {
                 time: 'เมื่อสักครู่', 
                 urgency: 'MEDIUM'
              });
-             updatedInventory[itemIndex] = { ...item, stock: Math.max(0, item.stock - qty) };
+             // หักสต็อกทีละรายการ (qty ต่อ 1 ศูนย์)
+             updatedInventory[itemIndex] = { ...item, stock: item.stock - Number(qty) };
           }
        });
     });
 
-    const existingData = localStorage.getItem('ems_requests');
-    const previousRequests = existingData ? JSON.parse(existingData) : [];
-    localStorage.setItem('ems_requests', JSON.stringify([...newRequests, ...previousRequests]));
+    localStorage.setItem('ems_requests', JSON.stringify([...newRequests, ...(JSON.parse(localStorage.getItem('ems_requests') || '[]'))]));
     localStorage.setItem('ems_inventory', JSON.stringify(updatedInventory));
     window.dispatchEvent(new Event('storage'));
-    alert('บันทึกใบเบิกเรียบร้อย!');
+    alert(`บันทึกใบเบิกเรียบร้อย! (เบิกจ่ายให้ทั้งหมด ${shelterCount} ศูนย์พักพิง)`);
     router.push('/');
   };
 
-  const filteredShelters = shelters.filter(s => 
-    s.name.includes(searchTerm) || s.district.includes(searchTerm)
-  );
-
-  const filteredInventory = inventory.filter(item => 
-    activeCategory === 'ทั้งหมด' || item.category === activeCategory
-  );
+  const filteredShelters = shelters.filter(s => s.name.includes(searchTerm) || s.district.includes(searchTerm));
+  const filteredInventory = inventory.filter(item => activeCategory === 'ทั้งหมด' || item.category === activeCategory);
 
   return (
-    <div className="min-h-screen bg-[#0B1120] text-slate-100 font-sans">
+    <div className="min-h-screen bg-[#0B1120] text-slate-100 font-sans overflow-hidden flex flex-col">
       <div className="fixed inset-0 z-0 pointer-events-none">
          <div className="absolute top-0 left-0 w-[40%] h-[40%] bg-emerald-900/10 rounded-full blur-[120px]" />
          <div className="absolute bottom-0 right-0 w-[40%] h-[40%] bg-blue-900/10 rounded-full blur-[120px]" />
       </div>
 
-      <div className="relative z-10 max-w-full mx-auto px-6 py-8 flex flex-col h-screen">
-        {/* Header */}
-        <div className="flex flex-col gap-6 mb-8 flex-shrink-0">
-          <div className="flex items-center gap-4">
-             <button onClick={() => step > 1 ? setStep(step - 1) : router.back()} className="p-3 rounded-xl bg-slate-800/50 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors">
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold text-white">เบิกจ่ายสิ่งของ</h1>
-                <p className="text-sm text-slate-400">สร้างใบเบิกสำหรับศูนย์พักพิง</p>
-              </div>
+      <div className="relative z-10 flex flex-col h-screen p-6">
+        <div className="flex-shrink-0 mb-8">
+          <div className="flex items-center justify-between mb-8">
+             <div className="flex items-center gap-4">
+                <button onClick={() => step > 1 ? setStep(step - 1) : router.back()} className="p-3 rounded-xl bg-slate-800/50 hover:bg-slate-700 border border-slate-700 text-slate-300">
+                    <ArrowLeft className="w-5 h-5" />
+                </button>
+                <div>
+                    <h1 className="text-2xl font-bold text-white uppercase tracking-tight">เบิกจ่ายสิ่งของ</h1>
+                    <p className="text-sm text-slate-400">สร้างใบเบิกสำหรับศูนย์พักพิง ({selectedShelters.length} ศูนย์ที่เลือก)</p>
+                </div>
+             </div>
+             
+             {step === 2 && (
+               <div className="flex bg-slate-900/80 border border-slate-700 p-1 rounded-xl">
+                  <button onClick={() => { setUploadMode(false); setExcelPreview([]); }} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${!uploadMode ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
+                    <Settings2 className="w-4 h-4" /> เลือกเอง
+                  </button>
+                  <button onClick={() => setUploadMode(true)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${uploadMode ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
+                    <FileSpreadsheet className="w-4 h-4" /> อัปโหลด Excel
+                  </button>
+               </div>
+             )}
           </div>
-          <div className="flex items-center justify-center gap-2 sm:gap-4 text-sm sm:text-base">
-             <div className={`flex items-center gap-2 ${step >= 1 ? 'text-emerald-400' : 'text-slate-600'}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold border-2 transition-colors ${step >= 1 ? 'bg-emerald-500 text-white border-emerald-500' : 'border-slate-600'}`}>1</div>
-                <span className="font-medium hidden sm:inline">เลือกศูนย์ฯ</span>
-             </div>
-             <div className="w-8 sm:w-16 h-[2px] bg-slate-700 relative">
-                <div className={`absolute top-0 left-0 h-full bg-emerald-500 transition-all duration-300 ${step >= 2 ? 'w-full' : 'w-0'}`} />
-             </div>
-             <div className={`flex items-center gap-2 ${step >= 2 ? 'text-emerald-400' : 'text-slate-500'}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold border-2 transition-colors ${step >= 2 ? 'bg-emerald-500 text-white border-emerald-500' : 'border-slate-600 bg-slate-800'}`}>2</div>
-                <span className="font-medium hidden sm:inline">เลือกของ</span>
-             </div>
-             <div className="w-8 sm:w-16 h-[2px] bg-slate-700 relative">
-                <div className={`absolute top-0 left-0 h-full bg-emerald-500 transition-all duration-300 ${step >= 3 ? 'w-full' : 'w-0'}`} />
-             </div>
-             <div className={`flex items-center gap-2 ${step >= 3 ? 'text-emerald-400' : 'text-slate-500'}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold border-2 transition-colors ${step >= 3 ? 'bg-emerald-500 text-white border-emerald-500' : 'border-slate-600 bg-slate-800'}`}>3</div>
-                <span className="font-medium hidden sm:inline">ยืนยัน</span>
-             </div>
+          
+          <div className="flex items-center justify-center gap-4 max-w-2xl mx-auto">
+             {[1, 2, 3].map((s, idx) => (
+                <div key={s} className="flex items-center gap-4">
+                    <div className={`flex items-center gap-3 ${step >= s ? 'text-emerald-400' : 'text-slate-600'}`}>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold border-2 transition-all ${step >= s ? 'bg-emerald-500 text-white border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'border-slate-700 bg-slate-800'}`}>{s}</div>
+                    </div>
+                    {idx < 2 && <div className="w-16 h-[2px] bg-slate-700 relative rounded-full overflow-hidden"><div className={`absolute top-0 left-0 h-full bg-emerald-500 transition-all duration-500 ${step > s ? 'w-full' : 'w-0'}`} /></div>}
+                </div>
+             ))}
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar pb-32">
+        <div className="flex-1 overflow-hidden relative">
           {step === 1 && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-               <div className="relative mb-6">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <input 
-                    type="text" 
-                    placeholder="ค้นหาชื่อศูนย์ หรืออำเภอ..." 
-                    className="w-full bg-slate-900/80 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white focus:ring-2 focus:ring-emerald-500/50 outline-none"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
+            <div className="h-full flex flex-col animate-in fade-in slide-in-from-right-4 duration-300">
+               <div className="relative mb-6 max-w-xl mx-auto w-full">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                  <input type="text" placeholder="ค้นหาชื่อศูนย์ หรืออำเภอ..." className="w-full bg-slate-900/60 border border-slate-700 rounded-2xl py-4 pl-12 pr-4 text-white outline-none focus:ring-2 focus:ring-emerald-500/50" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                </div>
-               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                  {filteredShelters.map((shelter) => {
-                    const isSelected = selectedShelters.includes(shelter.id);
-                    return (
-                      <div 
-                        key={shelter.id}
-                        onClick={() => toggleShelter(shelter.id)}
-                        className={`cursor-pointer p-4 rounded-xl border flex items-center justify-between transition-all duration-200 ${
-                          isSelected ? 'bg-emerald-500/10 border-emerald-500 shadow-lg' : 'bg-slate-900/60 border-slate-800 hover:border-slate-600 hover:bg-slate-800'
-                        }`}
-                      >
-                         <div className="flex items-center gap-3">
-                            <div className={`w-6 h-6 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-emerald-500 border-emerald-500' : 'border-slate-500'}`}>
-                               {isSelected && <Check className="w-4 h-4 text-white" />}
-                            </div>
-                            <div>
-                               <h3 className={`font-medium ${isSelected ? 'text-white' : 'text-slate-300'}`}>{shelter.name}</h3>
-                               <p className="text-sm text-slate-500 flex items-center gap-1"><MapPin className="w-3 h-3" /> {shelter.district}</p>
-                            </div>
-                         </div>
-                      </div>
-                    );
-                  })}
+               <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-32">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {filteredShelters.map((shelter) => (
+                        <div key={shelter.id} onClick={() => setSelectedShelters(prev => prev.includes(shelter.id) ? prev.filter(id => id !== shelter.id) : [...prev, shelter.id])} className={`cursor-pointer p-5 rounded-2xl border transition-all duration-300 ${selectedShelters.includes(shelter.id) ? 'bg-emerald-500/10 border-emerald-500 shadow-lg' : 'bg-slate-900/40 border-slate-800 hover:border-slate-600'}`}>
+                           <div className="flex items-start justify-between space-y-3 flex-col">
+                                 <div className={`w-6 h-6 rounded border flex items-center justify-center transition-all ${selectedShelters.includes(shelter.id) ? 'bg-emerald-500 border-emerald-500' : 'border-slate-600 bg-slate-800'}`}>{selectedShelters.includes(shelter.id) && <Check className="w-4 h-4 text-white" />}</div>
+                                 <div>
+                                    <h3 className={`font-bold ${selectedShelters.includes(shelter.id) ? 'text-white' : 'text-slate-300'}`}>{shelter.name}</h3>
+                                    <p className="text-xs text-slate-500 flex items-center gap-1 mt-1"><MapPin className="w-3 h-3" /> {shelter.district}</p>
+                                 </div>
+                           </div>
+                        </div>
+                      ))}
+                  </div>
                </div>
             </div>
           )}
 
           {step === 2 && (
-             <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 flex items-start gap-3 flex-1">
-                        <ShoppingCart className="w-5 h-5 text-emerald-400 mt-0.5" />
-                        <div>
-                            <h3 className="text-white font-medium">รายการเบิกจ่าย</h3>
-                            <p className="text-sm text-slate-400">กำลังเบิกให้ <span className="text-emerald-400 font-bold">{selectedShelters.length} แห่ง</span></p>
+             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full animate-in fade-in duration-300">
+                <div className="lg:col-span-8 flex flex-col h-full overflow-hidden">
+                   {!uploadMode ? (
+                      <>
+                        <div className="flex-shrink-0 mb-6 flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                            {categories.map((cat: string) => (
+                                <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-6 py-2.5 rounded-xl text-xs font-bold border transition-all whitespace-nowrap ${activeCategory === cat ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}>{cat}</button>
+                            ))}
                         </div>
-                    </div>
-                    {/* ตัวกรองหมวดหมู่ */}
-                    <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 md:pb-0">
-                        {categories.map(cat => (
-                            <button
-                                key={cat}
-                                onClick={() => setActiveCategory(cat)}
-                                className={`px-4 py-2 rounded-full text-sm font-medium border transition-all whitespace-nowrap ${
-                                    activeCategory === cat 
-                                    ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/20' 
-                                    : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'
-                                }`}
-                            >
-                                {cat}
-                            </button>
-                        ))}
-                    </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-32">
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                {filteredInventory.map((item) => {
+                                    const qty = cart[item.id] || 0;
+                                    const totalQty = qty * selectedShelters.length;
+                                    return (
+                                        <div key={item.id} className={`p-5 rounded-2xl bg-slate-900/40 border transition-all ${qty > 0 ? 'border-emerald-500/50 bg-emerald-900/5 shadow-md' : 'border-slate-800 hover:border-slate-700'}`}>
+                                            <div className="flex items-start justify-between mb-4">
+                                                <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center text-2xl border border-white/5">{item.image}</div>
+                                                <div className="text-right">
+                                                   <p className={`text-sm font-mono font-bold ${item.stock < totalQty ? 'text-red-400' : 'text-emerald-400'}`}>{item.stock}</p>
+                                                   <p className="text-[9px] text-slate-500 uppercase">Available</p>
+                                                </div>
+                                            </div>
+                                            <h3 className="text-white font-bold text-sm mb-1">{item.name}</h3>
+                                            <p className="text-[10px] text-slate-500 mb-4 uppercase tracking-wider">โควตา: {item.limit} / ศูนย์</p>
+                                            <input type="number" value={qty === 0 ? '' : qty} placeholder="ใส่จำนวน/ศูนย์" onChange={(e) => handleInputChange(item.id, e.target.value, item.limit, item.stock)} className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-2 px-3 text-center font-mono font-bold text-white outline-none focus:border-emerald-500" />
+                                            {qty > 0 && <p className="text-[10px] text-amber-500 mt-2 text-center font-bold">รวมเบิกทั้งสิ้น: {totalQty} {item.unit}</p>}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                      </>
+                   ) : (
+                      <div className="flex flex-col h-full bg-slate-900/40 border border-white/5 rounded-3xl overflow-hidden">
+                         <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/5">
+                            <div>
+                               <h3 className="text-lg font-bold text-white flex items-center gap-2 font-sans"><ListChecks className="text-emerald-500" /> ตรวจสอบรายการจาก Excel</h3>
+                               <p className="text-xs text-slate-500">จำนวนนี้จะถูกจ่ายให้ทั้ง {selectedShelters.length} ศูนย์</p>
+                            </div>
+                            {excelPreview.length > 0 && (
+                               <button onClick={importToCart} className="flex items-center gap-2 px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-sm font-bold shadow-lg">
+                                  <PlusCircle className="w-4 h-4" /> นำเข้ารวมหลัก
+                               </button>
+                            )}
+                         </div>
+                         <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
+                            {excelPreview.length === 0 ? (
+                               <div className="h-full flex flex-col items-center justify-center text-slate-600 opacity-50">
+                                  <AlertCircle className="w-12 h-12 mb-2" />
+                                  <p className="text-sm">ยังไม่มีข้อมูล โปรดอัปโหลดไฟล์</p>
+                               </div>
+                            ) : (
+                               excelPreview.map((item, idx) => (
+                                  <div key={idx} className="flex items-center justify-between p-4 bg-slate-800/50 border border-white/5 rounded-2xl">
+                                     <div className="flex items-center gap-4">
+                                        <span className="text-2xl">{item.image}</span>
+                                        <div><p className="text-sm font-bold text-white mb-1">{item.name}</p></div>
+                                     </div>
+                                     <div className="text-right">
+                                        <p className="text-xs font-black text-emerald-400 font-mono">ให้ที่ละ: {item.requestQty}</p>
+                                        <p className="text-[10px] text-amber-500 font-bold uppercase">รวม: {item.requestQty * selectedShelters.length} {item.unit}</p>
+                                     </div>
+                                  </div>
+                               ))
+                            )}
+                         </div>
+                      </div>
+                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-                   {filteredInventory.map((item) => {
-                     const qty = cart[item.id] || 0;
-                     const isMax = qty >= item.limit || qty >= item.stock;
-                     return (
-                       <div key={item.id} className={`p-4 rounded-2xl bg-slate-900/60 border ${qty > 0 ? 'border-emerald-500/50 bg-emerald-900/5' : 'border-slate-800'} transition-all`}>
-                          <div className="flex items-start justify-between mb-3">
-                             <div className="w-12 h-12 rounded-lg bg-slate-800 flex items-center justify-center text-2xl border border-slate-700">{item.image}</div>
-                             <div className="text-right">
-                                <span className="block text-xs text-slate-500">คงเหลือ</span>
-                                <span className={`font-mono font-bold ${item.stock < 50 ? 'text-red-400' : 'text-slate-300'}`}>{item.stock}</span>
-                             </div>
-                          </div>
-                          <h3 className="text-white font-medium mb-1">{item.name}</h3>
-                          <div className="flex items-center gap-1 text-xs text-slate-400 mb-4">
-                             <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-emerald-400 mb-1 inline-block uppercase">{item.category}</span>
-                             <div className="flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Max: {item.limit}</div>
-                          </div>
-                          
-                          {/* เปลี่ยนจากการกดเป็น Input */}
-                          <div className="flex items-center gap-2">
-                             <div className="relative flex-1">
-                                <input 
-                                    type="number"
-                                    min="0"
-                                    max={Math.min(item.limit, item.stock)}
-                                    value={qty === 0 ? '' : qty}
-                                    placeholder="0"
-                                    onChange={(e) => handleInputChange(item.id, e.target.value, item.limit, item.stock)}
-                                    className={`w-full bg-slate-800 border rounded-lg py-2 px-3 text-center font-mono font-bold focus:ring-2 outline-none transition-all ${
-                                        qty > 0 ? 'border-emerald-500 text-white focus:ring-emerald-500/50' : 'border-slate-700 text-slate-400 focus:ring-slate-600'
-                                    }`}
-                                />
-                                {isMax && qty > 0 && (
-                                    <span className="absolute -top-2 -right-1 bg-amber-500 text-[8px] text-black px-1 rounded font-bold">MAX</span>
-                                )}
-                             </div>
-                             <span className="text-xs text-slate-500 w-10">{item.unit}</span>
-                          </div>
-                       </div>
-                     );
-                   })}
+                <div className="lg:col-span-4 flex flex-col h-full gap-5 overflow-hidden pb-32">
+                   {uploadMode ? (
+                      <div className="flex-shrink-0 space-y-3">
+                         <div className="relative group border-2 border-dashed border-slate-700 hover:border-emerald-500 bg-slate-900/40 rounded-3xl p-8 transition-all flex flex-col items-center gap-4 text-center">
+                            <input type="file" accept=".xlsx, .xls" onChange={(e) => { const file = e.target.files?.[0]; if(file) processExcel(file); }} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                            <CloudUpload className="w-12 h-12 text-emerald-400" />
+                            <div><p className="text-white font-bold text-sm">ลากไฟล์ Excel วางที่นี่</p></div>
+                         </div>
+                         <button onClick={downloadSampleExcel} className="w-full py-3 rounded-xl bg-slate-800/40 text-slate-400 text-xs font-bold border border-white/5 flex items-center justify-center gap-2"><FileSpreadsheet className="w-4 h-4" /> ตัวอย่างไฟล์</button>
+                      </div>
+                   ) : (
+                      <div className="flex-1 flex flex-col min-h-0 bg-slate-900/40 border border-white/5 rounded-3xl overflow-hidden">
+                        <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/5">
+                           <h3 className="font-bold text-xs text-white uppercase tracking-wider flex items-center gap-2 font-mono"><ShoppingCart className="w-4 h-4 text-emerald-500" /> ตะกร้า (ต่อศูนย์)</h3>
+                           <span className="text-[10px] px-2 py-1 bg-emerald-500 text-white rounded-md font-black">{Object.keys(cart).length}</span>
+                        </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-2">
+                          {Object.keys(cart).length === 0 ? (
+                             <div className="h-full flex flex-col items-center justify-center text-slate-700 opacity-40"><Package className="w-10 h-10 mb-2" /><p className="text-[10px] font-bold uppercase">ว่างเปล่า</p></div>
+                          ) : (
+                            Object.entries(cart).map(([itemId, qty]) => {
+                               const item = inventory.find(i => i.id === Number(itemId));
+                               return (
+                                  <div key={itemId} className="flex items-center justify-between p-3 bg-slate-800/30 border border-white/5 rounded-xl group transition-all">
+                                     <div className="flex items-center gap-3">
+                                        <span className="text-xl">{item?.image}</span>
+                                        <div>
+                                           <p className="text-xs font-bold text-white leading-none mb-1">{item?.name}</p>
+                                           <p className="text-[10px] font-bold text-emerald-400 uppercase">{qty} {item?.unit} / ที่</p>
+                                        </div>
+                                     </div>
+                                     <button onClick={() => removeItem(Number(itemId))} className="p-1.5 hover:text-red-400 text-slate-600"><XCircle className="w-4 h-4" /></button>
+                                  </div>
+                               )
+                            })
+                          )}
+                        </div>
+                      </div>
+                   )}
                 </div>
              </div>
           )}
 
           {step === 3 && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300 max-w-6xl mx-auto">
-                <div className="text-center py-4">
-                    <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-2" />
-                    <h2 className="text-2xl font-bold text-white">ตรวจสอบข้อมูลการเบิก</h2>
+            <div className="h-full overflow-y-auto custom-scrollbar pr-2 pb-32 animate-in fade-in zoom-in-95 duration-300">
+                <div className="text-center py-12">
+                    <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/20 shadow-xl">
+                        <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+                    </div>
+                    <h2 className="text-3xl font-bold text-white">ยืนยันการเบิกจ่าย</h2>
+                    <p className="text-slate-500 text-sm mt-2">ตรวจสอบยอดรวมสำหรับการจ่ายให้ทั้ง {selectedShelters.length} ศูนย์</p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
-                        <h3 className="font-semibold text-white flex items-center gap-2 mb-4 border-b border-slate-700 pb-3"><MapPin className="w-4 h-4 text-emerald-400" /> ศูนย์พักพิง ({selectedShelters.length})</h3>
-                        <ul className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
-                            {selectedShelters.map(id => (
-                                <li key={id} className="text-sm text-slate-300 flex items-center gap-2">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {shelters.find(s => s.id === id)?.name}
-                                </li>
-                            ))}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto px-4">
+                    <div className="bg-slate-900/40 border border-white/5 rounded-3xl p-8">
+                        <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-2"><MapPin className="w-4 h-4 text-emerald-500" /> ปลายทาง ({selectedShelters.length})</h3>
+                        <ul className="space-y-3">
+                            {selectedShelters.map(id => <li key={id} className="text-sm bg-white/5 p-3 rounded-xl text-slate-300">{shelters.find(s => s.id === id)?.name}</li>)}
                         </ul>
                     </div>
-                    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
-                        <h3 className="font-semibold text-white flex items-center gap-2 mb-4 border-b border-slate-700 pb-3"><Package className="w-4 h-4 text-emerald-400" /> รายการเบิก ({Object.keys(cart).length})</h3>
-                        <ul className="space-y-3 max-h-48 overflow-y-auto custom-scrollbar pr-2">
+                    <div className="bg-slate-900/40 border border-white/5 rounded-3xl p-8">
+                        <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-2"><Package className="w-4 h-4 text-blue-500" /> ยอดเบิกสุทธิ (รวมทุกศูนย์)</h3>
+                        <ul className="space-y-3">
                             {Object.entries(cart).map(([itemId, qty]) => {
                                 const item = inventory.find(i => i.id === Number(itemId));
-                                return (
-                                    <li key={itemId} className="flex justify-between text-sm text-slate-300">
-                                        <span>{item?.name}</span>
-                                        <span className="font-mono text-emerald-400">x{qty} {item?.unit}</span>
-                                    </li>
-                                )
+                                const total = Number(qty) * selectedShelters.length;
+                                return <li key={itemId} className="flex justify-between items-center bg-white/5 p-3 rounded-xl text-sm text-slate-300"><span>{item?.name}</span><span className="font-mono text-emerald-400 font-bold">{total} {item?.unit}</span></li>
                             })}
                         </ul>
                     </div>
@@ -336,97 +394,38 @@ export default function RequisitionPage() {
           )}
         </div>
 
-        {/* Selected Bar for Step 1 */}
-        {step === 1 && selectedShelters.length > 0 && (
-          <div className="fixed bottom-24 left-6 right-6 z-40 animate-in slide-in-from-bottom-4">
-            <div className="bg-emerald-600 shadow-2xl rounded-2xl p-4 flex items-center justify-between border border-emerald-500">
-              <div className="flex items-center gap-4">
-                <div className="bg-white/20 p-2 rounded-xl"><ListChecks className="w-6 h-6 text-white" /></div>
-                <div>
-                  <p className="text-white font-bold">เลือกแล้ว {selectedShelters.length} สถานที่</p>
-                  <button onClick={() => setShowSelectedList(true)} className="text-emerald-100 text-xs hover:underline">กดเพื่อดูรายการ/แก้ไข</button>
-                </div>
-              </div>
-              <button onClick={clearAllSelected} className="bg-emerald-700/50 hover:bg-red-500 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 border border-emerald-500/50">
-                <Trash2 className="w-4 h-4" /> ล้างทั้งหมด
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Modal List */}
-        {showSelectedList && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl">
-              <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
-                <h3 className="text-xl font-bold text-white flex items-center gap-2"><ListChecks className="w-5 h-5 text-emerald-400" /> รายการที่เลือกไว้</h3>
-                <button onClick={() => setShowSelectedList(false)} className="p-2 hover:bg-slate-700 rounded-full transition-colors"><X className="w-5 h-5 text-slate-400" /></button>
-              </div>
-              <div className="p-6 max-h-96 overflow-y-auto custom-scrollbar space-y-2">
-                {selectedShelters.map(id => {
-                  const s = shelters.find(sh => sh.id === id);
-                  return (
-                    <div key={id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700">
-                      <div className="flex items-center gap-3">
-                        <MapPin className="w-4 h-4 text-emerald-500" />
-                        <span className="text-white font-medium">{s?.name}</span>
-                      </div>
-                      <button onClick={() => toggleShelter(id)} className="p-1.5 hover:text-red-400 text-slate-500 transition-colors"><XCircle className="w-5 h-5" /></button>
-                    </div>
-                  )
-                })}
-              </div>
-              <div className="p-6 bg-slate-800/30 border-t border-slate-800">
-                <button onClick={() => setShowSelectedList(false)} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-bold transition-all">ตกลง</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Bottom Navigation */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 z-50">
-           <div className="max-w-full mx-auto px-6 flex items-center justify-between">
-              <div className="text-sm">
-                 {step === 1 && <span className="text-slate-400">เลือกแล้ว <b className="text-white">{selectedShelters.length}</b> แห่ง</span>}
-                 {step === 2 && <span className="text-slate-400">รวมรายการ <b className="text-white">{Object.keys(cart).length}</b> ชนิด</span>}
-                 {step === 3 && <span className="text-emerald-400 font-bold">พร้อมยืนยันการเบิกจ่าย</span>}
-              </div>
-              <div className="flex gap-3">
-                 {step === 3 && (
-                   <button onClick={handleCancel} className="px-6 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold border border-red-500/20 transition-all active:scale-95"><Trash2 className="w-4 h-4" /></button>
-                 )}
-                 <button 
-                   onClick={() => {
-                     if (step === 1 && selectedShelters.length > 0) setStep(2);
-                     else if (step === 2 && Object.keys(cart).length > 0) setStep(3);
-                     else if (step === 3) handleSubmit();
-                   }}
-                   disabled={(step === 1 && selectedShelters.length === 0) || (step === 2 && Object.keys(cart).length === 0)}
-                   className={`px-8 py-3 rounded-xl font-bold flex items-center gap-2 transition-all ${
-                     ((step === 1 && selectedShelters.length === 0) || (step === 2 && Object.keys(cart).length === 0))
-                       ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                       : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg active:scale-95'
-                   }`}
-                 >
-                   {step === 3 ? <>ยืนยันการเบิก <FileText className="w-5 h-5" /></> : <>ถัดไป <ChevronRight className="w-5 h-5" /></>}
-                 </button>
-              </div>
-           </div>
+        <div className="fixed bottom-10 right-10 flex items-center gap-3 z-[100]">
+            {step > 1 && (
+                <button onClick={() => { if(confirm('ยกเลิกรายการทั้งหมด?')) { setSelectedShelters([]); setCart({}); setStep(1); } }} className="p-4 rounded-2xl bg-slate-800/80 hover:bg-red-500 text-slate-400 hover:text-white border border-white/5 transition-all shadow-2xl backdrop-blur-md">
+                    <Trash2 className="w-6 h-6" />
+                </button>
+            )}
+            <button 
+                onClick={() => {
+                    if (step === 1 && selectedShelters.length > 0) setStep(2);
+                    else if (step === 2 && Object.keys(cart).length > 0) setStep(3);
+                    else if (step === 3) handleSubmit();
+                }}
+                disabled={(step === 1 && selectedShelters.length === 0) || (step === 2 && Object.keys(cart).length === 0)}
+                className={`flex items-center gap-3 px-10 py-4 rounded-2xl font-bold transition-all shadow-2xl backdrop-blur-md ${
+                    ((step === 1 && selectedShelters.length === 0) || (step === 2 && Object.keys(cart).length === 0))
+                    ? 'bg-slate-800 text-slate-600 cursor-not-allowed opacity-50'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                }`}
+            >
+                <span className="text-sm uppercase tracking-widest font-sans">{step === 3 ? 'ยืนยันการเบิกจ่าย' : 'ถัดไป'}</span>
+                {step === 3 ? <FileText className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+            </button>
         </div>
       </div>
+
       <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 0.5); border-radius: 10px; }
-        /* ซ่อนลูกศรของ input type number */
-        input::-webkit-outer-spin-button,
-        input::-webkit-inner-spin-button {
-          -webkit-appearance: none;
-          margin: 0;
-        }
-        input[type=number] {
-          -moz-appearance: textfield;
-        }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.05); border-radius: 20px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(16, 185, 129, 0.3); }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
       `}</style>
     </div>
   );
