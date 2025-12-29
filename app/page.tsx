@@ -9,7 +9,6 @@ import {
   Users,
   Clock,
   TrendingUp,
-  Search,
   ChevronRight,
   ClipboardList,
   PackageMinus,
@@ -37,7 +36,6 @@ export default function Page() {
 
   const loadData = () => {
     try {
-        // Load Requests
         const storedRequests = localStorage.getItem('ems_requests');
         if (storedRequests) {
             const requests = JSON.parse(storedRequests);
@@ -49,7 +47,6 @@ export default function Page() {
             setRecentRequests([]);
         }
 
-        // Load Inventory Total
         const storedInv = localStorage.getItem('ems_inventory');
         if (storedInv) {
             const items = JSON.parse(storedInv);
@@ -90,10 +87,8 @@ export default function Page() {
 
   const handleCancelRequest = (id: any) => {
     if(!confirm('ยืนยันการยกเลิกคำร้องขอนี้?')) return;
-
     const target = recentRequests.find(r => r.id === id);
     if (!target) return;
-
     if (target.status === 'PENDING') {
         const storedInv = localStorage.getItem('ems_inventory');
         if (storedInv) {
@@ -105,11 +100,9 @@ export default function Page() {
             }
         }
     }
-
     const allRequests = JSON.parse(localStorage.getItem('ems_requests') || '[]');
     const newAllRequests = allRequests.filter((r: any) => r.id !== id);
     localStorage.setItem('ems_requests', JSON.stringify(newAllRequests));
-    
     loadData();
     window.dispatchEvent(new Event('storage'));
     setSelectedRequest(null);
@@ -149,25 +142,14 @@ export default function Page() {
 
       <div className="relative z-10 flex flex-col h-screen overflow-hidden">
         
-        {/* --- Header (ย้าย Logo มาไว้ที่นี่) --- */}
+        {/* --- Header (ตัด Search Bar ออกแล้ว) --- */}
         <header className="h-20 flex items-center justify-between px-8 bg-slate-900/40 backdrop-blur-md border-b border-slate-800/60 sticky top-0 z-20">
-            <div className="flex items-center gap-8">
-                <div className="flex items-center gap-3">
-                    <div className="min-w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-                        <Activity className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                        <h1 className="font-bold text-lg tracking-tight text-white leading-none">SISAKET<br/><span className="text-blue-400 text-sm font-medium">READY SYSTEM</span></h1>
-                    </div>
+            <div className="flex items-center gap-3">
+                <div className="min-w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                    <Activity className="w-6 h-6 text-white" />
                 </div>
-
-                <div className="hidden md:flex items-center gap-3 bg-slate-800/50 px-4 py-2 rounded-full border border-slate-700/50 focus-within:border-blue-500/50 focus-within:bg-slate-800 transition-all w-64 lg:w-96">
-                    <Search className="w-4 h-4 text-slate-400" />
-                    <input 
-                        type="text" 
-                        placeholder="ค้นหาระบบ..." 
-                        className="bg-transparent border-none outline-none text-sm text-slate-200 placeholder-slate-500 w-full"
-                    />
+                <div>
+                    <h1 className="font-bold text-lg tracking-tight text-white leading-none">SISAKET<br/><span className="text-blue-400 text-sm font-medium">READY SYSTEM</span></h1>
                 </div>
             </div>
 
@@ -186,10 +168,9 @@ export default function Page() {
             </div>
         </header>
 
-        {/* --- Main Content (Full Width) --- */}
+        {/* --- Main Content --- */}
         <main className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth custom-scrollbar">
             <div className="max-w-7xl mx-auto space-y-8">
-              
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
                   <h2 className="text-3xl font-bold text-white tracking-tight">ศูนย์สั่งการ</h2>
@@ -205,19 +186,16 @@ export default function Page() {
                       <div className="absolute top-0 right-0 p-4 opacity-50">
                         <stat.icon className={`w-16 h-16 ${stat.color} opacity-10 -rotate-12 transform group-hover:scale-110 transition-transform`} />
                       </div>
-                      
                       <div className="flex items-center gap-3 mb-4">
                         <div className={`p-2.5 rounded-lg ${stat.bg} ${stat.color}`}>
                           <stat.icon className="w-6 h-6" />
                         </div>
                         <span className="text-slate-400 font-medium text-sm">{stat.title}</span>
                       </div>
-                      
                       <div className="flex items-baseline gap-2">
                         <h3 className="text-3xl font-bold text-white font-mono">{stat.value}</h3>
                         <span className="text-slate-500 text-sm">{stat.unit ? `/ ${stat.total} ${stat.unit}` : stat.total}</span>
                       </div>
-                      
                       <div className={`mt-4 flex items-center gap-2 text-xs font-medium ${stat.href ? 'text-blue-400' : (stat.trendUp ? 'text-emerald-400' : 'text-rose-400')}`}>
                         {stat.href ? (
                           <div className="flex items-center gap-1 group-hover:translate-x-1 transition-transform">
@@ -233,9 +211,7 @@ export default function Page() {
                       </div>
                     </>
                   );
-
                   const cardClasses = `relative group overflow-hidden rounded-2xl border ${stat.border} bg-slate-900/40 backdrop-blur-sm p-6 transition-all duration-300 ${stat.href ? 'cursor-pointer hover:bg-slate-800/60' : ''}`;
-
                   if (stat.href) {
                     return (
                       <Link href={stat.href} key={i} className={cardClasses}>
@@ -243,7 +219,6 @@ export default function Page() {
                       </Link>
                     );
                   }
-
                   return (
                     <div key={i} className={cardClasses}>
                       <CardContent />
@@ -252,10 +227,7 @@ export default function Page() {
                 })}
               </div>
 
-              {/* Layout Content */}
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                 
-                 {/* Table: สถานะการเบิกจ่าย */}
                  <div className="xl:col-span-2 rounded-2xl border border-slate-700/50 bg-slate-900/60 backdrop-blur-md overflow-hidden flex flex-col min-h-[400px]">
                   <div className="p-6 border-b border-slate-700/50 flex items-center justify-between bg-slate-800/40">
                     <h3 className="font-semibold text-lg text-white flex items-center gap-2">
@@ -325,27 +297,19 @@ export default function Page() {
                     </table>
                   </div>
                  </div>
-
-                 {/* Notifications */}
                  <NotificationPanel />
-
               </div>
             </div>
         </main>
       </div>
 
-      {/* --- DETAIL MODAL (SHOPPING STYLE) --- */}
+      {/* --- DETAIL MODAL --- */}
       {selectedRequest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-                
-                {/* Header Image Area */}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                 <div className={`h-32 bg-gradient-to-br flex items-center justify-center relative ${selectedRequest.status === 'PENDING' ? 'from-yellow-600/20 to-orange-600/20' : selectedRequest.status === 'APPROVED' ? 'from-emerald-600/20 to-teal-600/20' : 'from-red-600/20 to-rose-600/20'}`}>
                     <div className="text-6xl drop-shadow-lg filter">{getItemIcon(selectedRequest.item)}</div>
-                    <button 
-                        onClick={() => setSelectedRequest(null)}
-                        className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 rounded-full text-white transition-colors"
-                    >
+                    <button onClick={() => setSelectedRequest(null)} className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 rounded-full text-white">
                         <X className="w-5 h-5" />
                     </button>
                     <div className="absolute bottom-4 left-4">
@@ -354,11 +318,7 @@ export default function Page() {
                         </span>
                     </div>
                 </div>
-
-                {/* Content */}
                 <div className="p-6 overflow-y-auto custom-scrollbar">
-                    
-                    {/* Item Details */}
                     <div className="mb-6">
                         <h3 className="text-2xl font-bold text-white mb-1">{selectedRequest.item}</h3>
                         <p className="text-slate-400 text-sm flex items-center gap-2">
@@ -367,8 +327,6 @@ export default function Page() {
                             <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {selectedRequest.time}</span>
                         </p>
                     </div>
-
-                    {/* Quantity Card */}
                     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-6 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300">
@@ -379,90 +337,39 @@ export default function Page() {
                                 <p className="text-white font-medium">{selectedRequest.quantity} {selectedRequest.unit}</p>
                             </div>
                         </div>
-                        <div className="text-right">
-                            <p className="text-xs text-slate-400">ความเร่งด่วน</p>
-                            <p className={`font-bold ${selectedRequest.urgency === 'CRITICAL' ? 'text-red-400' : 'text-emerald-400'}`}>
-                                {selectedRequest.urgency || 'NORMAL'}
-                            </p>
-                        </div>
                     </div>
-
-                    {/* Timeline */}
                     <div className="mb-6">
                         <h4 className="text-sm font-semibold text-slate-300 mb-4">สถานะการดำเนินการ</h4>
                         <div className="relative pl-4 border-l-2 border-slate-700 space-y-6">
                             <div className="relative">
                                 <div className="absolute -left-[21px] top-0 w-3 h-3 rounded-full bg-emerald-500 ring-4 ring-slate-900" />
                                 <p className="text-sm text-white font-medium">ส่งคำร้องขอแล้ว</p>
-                                <p className="text-xs text-slate-500">ระบบได้รับข้อมูลเรียบร้อย</p>
                             </div>
                             <div className="relative">
-                                <div className={`absolute -left-[21px] top-0 w-3 h-3 rounded-full ring-4 ring-slate-900 ${selectedRequest.status !== 'PENDING' ? (selectedRequest.status === 'REJECTED' ? 'bg-red-500' : 'bg-emerald-500') : 'bg-slate-600'}`} />
-                                <p className={`text-sm font-medium ${selectedRequest.status === 'PENDING' ? 'text-slate-500' : 'text-white'}`}>
-                                    {selectedRequest.status === 'REJECTED' ? 'คำร้องถูกปฏิเสธ' : 'อนุมัติการเบิกจ่าย'}
-                                </p>
-                                <p className="text-xs text-slate-500">
-                                    {selectedRequest.status === 'PENDING' ? 'รอเจ้าหน้าที่ตรวจสอบ' : (selectedRequest.status === 'REJECTED' ? 'สต๊อกสินค้าคืนสู่คลัง' : 'เจ้าหน้าที่อนุมัติแล้ว')}
-                                </p>
-                            </div>
-                            <div className="relative">
-                                <div className={`absolute -left-[21px] top-0 w-3 h-3 rounded-full ring-4 ring-slate-900 ${selectedRequest.status === 'COMPLETED' ? 'bg-emerald-500' : 'bg-slate-600'}`} />
-                                <p className={`text-sm font-medium ${selectedRequest.status === 'COMPLETED' ? 'text-white' : 'text-slate-500'}`}>จัดส่ง/รับของแล้ว</p>
+                                <div className={`absolute -left-[21px] top-0 w-3 h-3 rounded-full ring-4 ring-slate-900 ${selectedRequest.status !== 'PENDING' ? 'bg-emerald-500' : 'bg-slate-600'}`} />
+                                <p className="text-sm text-white font-medium">เจ้าหน้าที่ตรวจสอบ</p>
                             </div>
                         </div>
                     </div>
-
-                    {/* Requester Info */}
                     <div>
-                        <h4 className="text-sm font-semibold text-slate-300 mb-3">ข้อมูลผู้เบิก/จัดส่ง</h4>
+                        <h4 className="text-sm font-semibold text-slate-300 mb-3">ข้อมูลผู้เบิก</h4>
                         <div className="bg-slate-800/30 rounded-xl p-4 space-y-3">
                             <div className="flex items-start gap-3">
-                                <MapPin className="w-5 h-5 text-blue-400 mt-0.5" />
+                                <MapPin className="w-5 h-5 text-blue-400" />
                                 <div>
                                     <p className="text-sm text-white">{selectedRequest.requester}</p>
                                     <p className="text-xs text-slate-500">{selectedRequest.location}</p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <User className="w-5 h-5 text-slate-400" />
-                                <p className="text-sm text-slate-300">เจ้าหน้าที่ประจำศูนย์</p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <Phone className="w-5 h-5 text-slate-400" />
-                                <p className="text-sm text-slate-300">045-XXX-XXX</p>
-                            </div>
                         </div>
                     </div>
                 </div>
-
-                {/* Footer Actions */}
                 <div className="p-4 border-t border-slate-800 bg-slate-800/50 flex gap-3">
-                    {selectedRequest.status === 'PENDING' ? (
-                        <button 
-                            onClick={() => handleCancelRequest(selectedRequest.id)}
-                            className="flex-1 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-bold transition-colors flex items-center justify-center gap-2"
-                        >
-                            <Trash2 className="w-4 h-4" /> ยกเลิกคำสั่ง
-                        </button>
-                    ) : (
-                        <button 
-                            onClick={() => setSelectedRequest(null)}
-                            className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold transition-colors"
-                        >
-                            ปิดหน้าต่าง
-                        </button>
-                    )}
+                    <button onClick={() => setSelectedRequest(null)} className="flex-1 py-3 rounded-xl bg-slate-700 text-white font-bold">ปิดหน้าต่าง</button>
                 </div>
-
             </div>
         </div>
       )}
-
-      <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 0.5); border-radius: 10px; }
-      `}</style>
     </div>
   );
 }
