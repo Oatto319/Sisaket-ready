@@ -16,20 +16,26 @@ import {
   FileText,
   Edit2,
   Trash2,
-  CheckCircle2
+  CheckCircle2,
+  X,
+  ListChecks,
+  XCircle,
+  Filter
 } from 'lucide-react';
 
 export default function RequisitionPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showSelectedList, setShowSelectedList] = useState(false);
+  const [activeCategory, setActiveCategory] = useState('ทั้งหมด');
   
-  // --- State ---
   const [selectedShelters, setSelectedShelters] = useState<number[]>([]);
   const [cart, setCart] = useState<{ [key: number]: number }>({});
   const [inventory, setInventory] = useState<any[]>([]);
 
-  // Mock Shelters
+  const categories = ['ทั้งหมด', 'อาหารและน้ำ', 'ยารักษาโรค', 'เครื่องนุ่งห่ม', 'ของใช้ทั่วไป'];
+
   const shelters = [
     { id: 1, name: 'โรงเรียนสตรีสิริเกศ', district: 'เมืองศรีสะเกษ' },
     { id: 2, name: 'อาคารเฉลิมพระเกียรติฯ', district: 'กันทรลักษ์' },
@@ -38,13 +44,11 @@ export default function RequisitionPage() {
     { id: 5, name: 'โรงเรียนขุขันธ์', district: 'ขุขันธ์' },
   ];
 
-  // โหลด Inventory จาก LocalStorage
   useEffect(() => {
      const storedInv = localStorage.getItem('ems_inventory');
      if (storedInv) {
         setInventory(JSON.parse(storedInv));
      } else {
-        // Fallback default
         const defaultInv = [
             { id: 1, name: 'น้ำดื่ม (แพ็ค)', stock: 500, limit: 50, image: '💧', unit: 'แพ็ค', category: 'อาหารและน้ำ' },
             { id: 2, name: 'ข้าวสาร (5 กก.)', stock: 200, limit: 20, image: '🌾', unit: 'ถุง', category: 'อาหารและน้ำ' },
@@ -52,6 +56,7 @@ export default function RequisitionPage() {
             { id: 4, name: 'ปลากระป๋อง', stock: 800, limit: 100, image: '🐟', unit: 'แพ็ค', category: 'อาหารและน้ำ' },
             { id: 5, name: 'ยาสามัญชุดเล็ก', stock: 150, limit: 10, image: '💊', unit: 'ชุด', category: 'ยารักษาโรค' },
             { id: 6, name: 'ผ้าห่ม', stock: 300, limit: 50, image: '🧣', unit: 'ผืน', category: 'เครื่องนุ่งห่ม' },
+            { id: 7, name: 'สบู่/ยาสีฟัน', stock: 400, limit: 40, image: '🧼', unit: 'ชุด', category: 'ของใช้ทั่วไป' },
         ];
         setInventory(defaultInv);
         localStorage.setItem('ems_inventory', JSON.stringify(defaultInv));
@@ -64,15 +69,26 @@ export default function RequisitionPage() {
     );
   };
 
-  const updateCart = (itemId: number, delta: number, limit: number, stock: number) => {
+  const clearAllSelected = () => {
+    if(confirm('ต้องการล้างสถานที่ที่เลือกทั้งหมดหรือไม่?')) {
+      setSelectedShelters([]);
+      setShowSelectedList(false);
+    }
+  };
+
+  // ฟังก์ชันใหม่สำหรับการพิมพ์จำนวน
+  const handleInputChange = (itemId: number, value: string, limit: number, stock: number) => {
+    const numValue = value === '' ? 0 : parseInt(value);
+    if (isNaN(numValue)) return;
+
+    const safeValue = Math.max(0, Math.min(limit, Math.min(stock, numValue)));
+    
     setCart(prev => {
-      const currentQty = prev[itemId] || 0;
-      const newQty = Math.max(0, Math.min(limit, Math.min(stock, currentQty + delta)));
-      if (newQty === 0) {
+      if (safeValue === 0) {
         const { [itemId]: _, ...rest } = prev;
         return rest;
       }
-      return { ...prev, [itemId]: newQty };
+      return { ...prev, [itemId]: safeValue };
     });
   };
 
@@ -86,22 +102,17 @@ export default function RequisitionPage() {
 
   const handleSubmit = () => {
     const newRequests: any[] = [];
-    // Clone inventory มาเพื่อตัดสต๊อก
     const updatedInventory = [...inventory];
     
     selectedShelters.forEach(shelterId => {
        const shelter = shelters.find(s => s.id === shelterId);
        Object.entries(cart).forEach(([itemId, qty]) => {
-          // หาตำแหน่งของในคลัง
           const itemIndex = updatedInventory.findIndex(i => i.id === Number(itemId));
-          
           if (shelter && itemIndex !== -1) {
              const item = updatedInventory[itemIndex];
-             
-             // สร้าง Request
              newRequests.push({
                 id: Date.now() + Math.random(),
-                itemId: item.id, // เก็บ ID ไว้เพื่อใช้คืนของตอน Reject
+                itemId: item.id,
                 item: item.name,
                 quantity: qty,
                 unit: item.unit,
@@ -112,33 +123,26 @@ export default function RequisitionPage() {
                 time: 'เมื่อสักครู่', 
                 urgency: 'MEDIUM'
              });
-
-             // *** ตัดสต๊อกทันที ***
-             updatedInventory[itemIndex] = {
-                 ...item,
-                 stock: Math.max(0, item.stock - qty)
-             };
+             updatedInventory[itemIndex] = { ...item, stock: Math.max(0, item.stock - qty) };
           }
        });
     });
 
-    // 1. บันทึก Requests
     const existingData = localStorage.getItem('ems_requests');
     const previousRequests = existingData ? JSON.parse(existingData) : [];
     localStorage.setItem('ems_requests', JSON.stringify([...newRequests, ...previousRequests]));
-
-    // 2. บันทึก Inventory ที่ถูกตัดสต๊อก
     localStorage.setItem('ems_inventory', JSON.stringify(updatedInventory));
-
-    // 3. ส่งสัญญาณอัปเดต
     window.dispatchEvent(new Event('storage'));
-
-    alert('บันทึกใบเบิกเรียบร้อย! ตัดสต๊อกคลังสินค้าแล้ว');
+    alert('บันทึกใบเบิกเรียบร้อย!');
     router.push('/');
   };
 
   const filteredShelters = shelters.filter(s => 
     s.name.includes(searchTerm) || s.district.includes(searchTerm)
+  );
+
+  const filteredInventory = inventory.filter(item => 
+    activeCategory === 'ทั้งหมด' || item.category === activeCategory
   );
 
   return (
@@ -148,13 +152,11 @@ export default function RequisitionPage() {
          <div className="absolute bottom-0 right-0 w-[40%] h-[40%] bg-blue-900/10 rounded-full blur-[120px]" />
       </div>
 
-      <div className="relative z-10 max-w-5xl mx-auto px-4 py-8 flex flex-col h-screen">
+      <div className="relative z-10 max-w-full mx-auto px-6 py-8 flex flex-col h-screen">
+        {/* Header */}
         <div className="flex flex-col gap-6 mb-8 flex-shrink-0">
           <div className="flex items-center gap-4">
-             <button 
-                onClick={() => step > 1 ? setStep(step - 1) : router.back()}
-                className="p-3 rounded-xl bg-slate-800/50 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors"
-              >
+             <button onClick={() => step > 1 ? setStep(step - 1) : router.back()} className="p-3 rounded-xl bg-slate-800/50 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors">
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div>
@@ -184,7 +186,7 @@ export default function RequisitionPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar pb-28">
+        <div className="flex-1 overflow-y-auto custom-scrollbar pb-32">
           {step === 1 && (
             <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
                <div className="relative mb-6">
@@ -192,12 +194,12 @@ export default function RequisitionPage() {
                   <input 
                     type="text" 
                     placeholder="ค้นหาชื่อศูนย์ หรืออำเภอ..." 
-                    className="w-full bg-slate-900/80 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 outline-none"
+                    className="w-full bg-slate-900/80 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white focus:ring-2 focus:ring-emerald-500/50 outline-none"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                </div>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {filteredShelters.map((shelter) => {
                     const isSelected = selectedShelters.includes(shelter.id);
                     return (
@@ -205,9 +207,7 @@ export default function RequisitionPage() {
                         key={shelter.id}
                         onClick={() => toggleShelter(shelter.id)}
                         className={`cursor-pointer p-4 rounded-xl border flex items-center justify-between transition-all duration-200 ${
-                          isSelected 
-                            ? 'bg-emerald-500/10 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.1)]' 
-                            : 'bg-slate-900/60 border-slate-800 hover:border-slate-600 hover:bg-slate-800'
+                          isSelected ? 'bg-emerald-500/10 border-emerald-500 shadow-lg' : 'bg-slate-900/60 border-slate-800 hover:border-slate-600 hover:bg-slate-800'
                         }`}
                       >
                          <div className="flex items-center gap-3">
@@ -225,57 +225,73 @@ export default function RequisitionPage() {
                </div>
             </div>
           )}
+
           {step === 2 && (
              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 flex items-start gap-3">
-                   <ShoppingCart className="w-5 h-5 text-emerald-400 mt-0.5" />
-                   <div>
-                      <h3 className="text-white font-medium">รายการเบิกจ่าย</h3>
-                      <p className="text-sm text-slate-400">
-                         กำลังทำรายการเบิกให้: <span className="text-emerald-400 font-bold">{selectedShelters.length} แห่ง</span>
-                      </p>
-                   </div>
+                <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 flex items-start gap-3 flex-1">
+                        <ShoppingCart className="w-5 h-5 text-emerald-400 mt-0.5" />
+                        <div>
+                            <h3 className="text-white font-medium">รายการเบิกจ่าย</h3>
+                            <p className="text-sm text-slate-400">กำลังเบิกให้ <span className="text-emerald-400 font-bold">{selectedShelters.length} แห่ง</span></p>
+                        </div>
+                    </div>
+                    {/* ตัวกรองหมวดหมู่ */}
+                    <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 md:pb-0">
+                        {categories.map(cat => (
+                            <button
+                                key={cat}
+                                onClick={() => setActiveCategory(cat)}
+                                className={`px-4 py-2 rounded-full text-sm font-medium border transition-all whitespace-nowrap ${
+                                    activeCategory === cat 
+                                    ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/20' 
+                                    : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'
+                                }`}
+                            >
+                                {cat}
+                            </button>
+                        ))}
+                    </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                   {inventory.map((item) => {
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                   {filteredInventory.map((item) => {
                      const qty = cart[item.id] || 0;
                      const isMax = qty >= item.limit || qty >= item.stock;
-
                      return (
                        <div key={item.id} className={`p-4 rounded-2xl bg-slate-900/60 border ${qty > 0 ? 'border-emerald-500/50 bg-emerald-900/5' : 'border-slate-800'} transition-all`}>
                           <div className="flex items-start justify-between mb-3">
-                             <div className="w-12 h-12 rounded-lg bg-slate-800 flex items-center justify-center text-2xl border border-slate-700">
-                                {item.image}
-                             </div>
+                             <div className="w-12 h-12 rounded-lg bg-slate-800 flex items-center justify-center text-2xl border border-slate-700">{item.image}</div>
                              <div className="text-right">
                                 <span className="block text-xs text-slate-500">คงเหลือ</span>
-                                <span className={`font-mono font-bold ${item.stock < 50 ? 'text-red-400' : 'text-slate-300'}`}>
-                                  {item.stock}
-                                </span>
+                                <span className={`font-mono font-bold ${item.stock < 50 ? 'text-red-400' : 'text-slate-300'}`}>{item.stock}</span>
                              </div>
                           </div>
                           <h3 className="text-white font-medium mb-1">{item.name}</h3>
                           <div className="flex items-center gap-1 text-xs text-slate-400 mb-4">
-                             <AlertCircle className="w-3 h-3" /> สูงสุด: {item.limit} {item.unit}
+                             <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-emerald-400 mb-1 inline-block uppercase">{item.category}</span>
+                             <div className="flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Max: {item.limit}</div>
                           </div>
-                          <div className="flex items-center justify-between bg-slate-800 rounded-lg p-1">
-                             <button 
-                               onClick={() => updateCart(item.id, -1, item.limit, item.stock)}
-                               disabled={qty === 0}
-                               className="w-8 h-8 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-30 disabled:hover:bg-slate-700 text-white flex items-center justify-center transition-colors"
-                             >
-                               <Minus className="w-4 h-4" />
-                             </button>
-                             <span className={`font-mono font-bold text-lg ${qty > 0 ? 'text-white' : 'text-slate-500'}`}>
-                               {qty}
-                             </span>
-                             <button 
-                               onClick={() => updateCart(item.id, 1, item.limit, item.stock)}
-                               disabled={isMax}
-                               className={`w-8 h-8 rounded flex items-center justify-center transition-colors ${isMax ? 'bg-slate-700 opacity-50' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
-                             >
-                               <Plus className="w-4 h-4" />
-                             </button>
+                          
+                          {/* เปลี่ยนจากการกดเป็น Input */}
+                          <div className="flex items-center gap-2">
+                             <div className="relative flex-1">
+                                <input 
+                                    type="number"
+                                    min="0"
+                                    max={Math.min(item.limit, item.stock)}
+                                    value={qty === 0 ? '' : qty}
+                                    placeholder="0"
+                                    onChange={(e) => handleInputChange(item.id, e.target.value, item.limit, item.stock)}
+                                    className={`w-full bg-slate-800 border rounded-lg py-2 px-3 text-center font-mono font-bold focus:ring-2 outline-none transition-all ${
+                                        qty > 0 ? 'border-emerald-500 text-white focus:ring-emerald-500/50' : 'border-slate-700 text-slate-400 focus:ring-slate-600'
+                                    }`}
+                                />
+                                {isMax && qty > 0 && (
+                                    <span className="absolute -top-2 -right-1 bg-amber-500 text-[8px] text-black px-1 rounded font-bold">MAX</span>
+                                )}
+                             </div>
+                             <span className="text-xs text-slate-500 w-10">{item.unit}</span>
                           </div>
                        </div>
                      );
@@ -283,55 +299,33 @@ export default function RequisitionPage() {
                 </div>
              </div>
           )}
+
           {step === 3 && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300 max-w-3xl mx-auto">
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300 max-w-6xl mx-auto">
                 <div className="text-center py-4">
-                    <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
-                        <CheckCircle2 className="w-8 h-8 text-emerald-400" />
-                    </div>
+                    <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-2" />
                     <h2 className="text-2xl font-bold text-white">ตรวจสอบข้อมูลการเบิก</h2>
-                    <p className="text-slate-400">กรุณาตรวจสอบความถูกต้องก่อนยืนยัน</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
-                        <div className="flex items-center justify-between mb-4 border-b border-slate-700 pb-3">
-                            <h3 className="font-semibold text-white flex items-center gap-2">
-                                <MapPin className="w-4 h-4 text-emerald-400" /> 
-                                ศูนย์พักพิง ({selectedShelters.length})
-                            </h3>
-                            <button onClick={() => setStep(1)} className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
-                                <Edit2 className="w-3 h-3" /> แก้ไข
-                            </button>
-                        </div>
+                        <h3 className="font-semibold text-white flex items-center gap-2 mb-4 border-b border-slate-700 pb-3"><MapPin className="w-4 h-4 text-emerald-400" /> ศูนย์พักพิง ({selectedShelters.length})</h3>
                         <ul className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
-                            {selectedShelters.map(id => {
-                                const shelter = shelters.find(s => s.id === id);
-                                return (
-                                    <li key={id} className="text-sm text-slate-300 flex items-start gap-2">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-500 mt-1.5 flex-shrink-0" />
-                                        {shelter?.name}
-                                    </li>
-                                )
-                            })}
+                            {selectedShelters.map(id => (
+                                <li key={id} className="text-sm text-slate-300 flex items-center gap-2">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {shelters.find(s => s.id === id)?.name}
+                                </li>
+                            ))}
                         </ul>
                     </div>
                     <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
-                        <div className="flex items-center justify-between mb-4 border-b border-slate-700 pb-3">
-                            <h3 className="font-semibold text-white flex items-center gap-2">
-                                <Package className="w-4 h-4 text-emerald-400" /> 
-                                รายการเบิก ({Object.keys(cart).length})
-                            </h3>
-                            <button onClick={() => setStep(2)} className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
-                                <Edit2 className="w-3 h-3" /> แก้ไข
-                            </button>
-                        </div>
+                        <h3 className="font-semibold text-white flex items-center gap-2 mb-4 border-b border-slate-700 pb-3"><Package className="w-4 h-4 text-emerald-400" /> รายการเบิก ({Object.keys(cart).length})</h3>
                         <ul className="space-y-3 max-h-48 overflow-y-auto custom-scrollbar pr-2">
                             {Object.entries(cart).map(([itemId, qty]) => {
                                 const item = inventory.find(i => i.id === Number(itemId));
                                 return (
-                                    <li key={itemId} className="flex justify-between text-sm">
-                                        <span className="text-slate-300">{item?.name}</span>
-                                        <span className="font-mono font-medium text-emerald-400">x{qty} {item?.unit}</span>
+                                    <li key={itemId} className="flex justify-between text-sm text-slate-300">
+                                        <span>{item?.name}</span>
+                                        <span className="font-mono text-emerald-400">x{qty} {item?.unit}</span>
                                     </li>
                                 )
                             })}
@@ -342,44 +336,79 @@ export default function RequisitionPage() {
           )}
         </div>
 
+        {/* Selected Bar for Step 1 */}
+        {step === 1 && selectedShelters.length > 0 && (
+          <div className="fixed bottom-24 left-6 right-6 z-40 animate-in slide-in-from-bottom-4">
+            <div className="bg-emerald-600 shadow-2xl rounded-2xl p-4 flex items-center justify-between border border-emerald-500">
+              <div className="flex items-center gap-4">
+                <div className="bg-white/20 p-2 rounded-xl"><ListChecks className="w-6 h-6 text-white" /></div>
+                <div>
+                  <p className="text-white font-bold">เลือกแล้ว {selectedShelters.length} สถานที่</p>
+                  <button onClick={() => setShowSelectedList(true)} className="text-emerald-100 text-xs hover:underline">กดเพื่อดูรายการ/แก้ไข</button>
+                </div>
+              </div>
+              <button onClick={clearAllSelected} className="bg-emerald-700/50 hover:bg-red-500 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 border border-emerald-500/50">
+                <Trash2 className="w-4 h-4" /> ล้างทั้งหมด
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal List */}
+        {showSelectedList && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl">
+              <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
+                <h3 className="text-xl font-bold text-white flex items-center gap-2"><ListChecks className="w-5 h-5 text-emerald-400" /> รายการที่เลือกไว้</h3>
+                <button onClick={() => setShowSelectedList(false)} className="p-2 hover:bg-slate-700 rounded-full transition-colors"><X className="w-5 h-5 text-slate-400" /></button>
+              </div>
+              <div className="p-6 max-h-96 overflow-y-auto custom-scrollbar space-y-2">
+                {selectedShelters.map(id => {
+                  const s = shelters.find(sh => sh.id === id);
+                  return (
+                    <div key={id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700">
+                      <div className="flex items-center gap-3">
+                        <MapPin className="w-4 h-4 text-emerald-500" />
+                        <span className="text-white font-medium">{s?.name}</span>
+                      </div>
+                      <button onClick={() => toggleShelter(id)} className="p-1.5 hover:text-red-400 text-slate-500 transition-colors"><XCircle className="w-5 h-5" /></button>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="p-6 bg-slate-800/30 border-t border-slate-800">
+                <button onClick={() => setShowSelectedList(false)} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-bold transition-all">ตกลง</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom Navigation */}
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 z-50">
-           <div className="max-w-5xl mx-auto flex items-center justify-between">
+           <div className="max-w-full mx-auto px-6 flex items-center justify-between">
               <div className="text-sm">
                  {step === 1 && <span className="text-slate-400">เลือกแล้ว <b className="text-white">{selectedShelters.length}</b> แห่ง</span>}
                  {step === 2 && <span className="text-slate-400">รวมรายการ <b className="text-white">{Object.keys(cart).length}</b> ชนิด</span>}
-                 {step === 3 && <span className="text-slate-400">พร้อมยืนยัน <b className="text-emerald-400">ทั้งหมด</b></span>}
+                 {step === 3 && <span className="text-emerald-400 font-bold">พร้อมยืนยันการเบิกจ่าย</span>}
               </div>
               <div className="flex gap-3">
                  {step === 3 && (
-                   <button 
-                     onClick={handleCancel}
-                     className="px-6 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold transition-colors flex items-center gap-2 border border-red-500/20"
-                   >
-                     <Trash2 className="w-4 h-4" /> ยกเลิก
-                   </button>
+                   <button onClick={handleCancel} className="px-6 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold border border-red-500/20 transition-all active:scale-95"><Trash2 className="w-4 h-4" /></button>
                  )}
                  <button 
                    onClick={() => {
-                     if (step === 1) {
-                        if (selectedShelters.length > 0) setStep(2);
-                     } else if (step === 2) {
-                        if (Object.keys(cart).length > 0) setStep(3);
-                     } else {
-                        handleSubmit();
-                     }
+                     if (step === 1 && selectedShelters.length > 0) setStep(2);
+                     else if (step === 2 && Object.keys(cart).length > 0) setStep(3);
+                     else if (step === 3) handleSubmit();
                    }}
                    disabled={(step === 1 && selectedShelters.length === 0) || (step === 2 && Object.keys(cart).length === 0)}
                    className={`px-8 py-3 rounded-xl font-bold flex items-center gap-2 transition-all ${
                      ((step === 1 && selectedShelters.length === 0) || (step === 2 && Object.keys(cart).length === 0))
                        ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                       : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 hover:scale-105'
+                       : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg active:scale-95'
                    }`}
                  >
-                   {step === 3 ? (
-                     <>ยืนยันการเบิก <FileText className="w-5 h-5" /></>
-                   ) : (
-                     <>ถัดไป <ChevronRight className="w-5 h-5" /></>
-                   )}
+                   {step === 3 ? <>ยืนยันการเบิก <FileText className="w-5 h-5" /></> : <>ถัดไป <ChevronRight className="w-5 h-5" /></>}
                  </button>
               </div>
            </div>
@@ -389,6 +418,15 @@ export default function RequisitionPage() {
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 0.5); border-radius: 10px; }
+        /* ซ่อนลูกศรของ input type number */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        input[type=number] {
+          -moz-appearance: textfield;
+        }
       `}</style>
     </div>
   );
