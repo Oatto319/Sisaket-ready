@@ -30,11 +30,51 @@ export default function Page() {
   const [pendingCount, setPendingCount] = useState(0);
   const [totalStock, setTotalStock] = useState(0);
   const [recentRequests, setRecentRequests] = useState<any[]>([]);
-  const [shelterCount, setShelterCount] = useState(0); // ✅ เพิ่ม state สำหรับจำนวนศูนย์
-  const [loadingShelters, setLoadingShelters] = useState(true); // ✅ loading state
+  const [shelterCount, setShelterCount] = useState(0);
+  const [loadingShelters, setLoadingShelters] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
   
   // Modal State
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
+
+  // ✅ ฟังก์ชันดึง role จาก localStorage
+  const loadUserRole = () => {
+    try {
+      // 🟢 วิธีที่ 1: ดึงจาก localStorage.userRole
+      const storedRole = localStorage.getItem('userRole');
+      
+      if (storedRole) {
+        const normalizedRole = String(storedRole).toUpperCase().trim();
+        setUserRole(normalizedRole);
+        console.log(`✅ Role loaded: ${normalizedRole}`);
+        return;
+      }
+
+      // 🟢 วิธีที่ 2: ดึงจาก localStorage.user object
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        try {
+          const userObj = JSON.parse(storedUser);
+          const roleFields = ['role', 'userRole', 'type'];
+          
+          for (const field of roleFields) {
+            if (userObj[field]) {
+              const normalizedRole = String(userObj[field]).toUpperCase().trim();
+              setUserRole(normalizedRole);
+              console.log(`✅ Role loaded from user object: ${normalizedRole}`);
+              return;
+            }
+          }
+        } catch (e) {
+          console.log('⚠️ Could not parse user object');
+        }
+      }
+
+      console.log('⚠️ No role found in localStorage');
+    } catch (error) {
+      console.error('Error loading user role:', error);
+    }
+  };
 
   // ✅ ฟังก์ชันดึงจำนวนศูนย์พักพิง
   const loadShelterCount = async () => {
@@ -42,7 +82,6 @@ export default function Page() {
       const response = await fetch('/api/centers');
       if (response.ok) {
         const data = await response.json();
-        // นับจำนวน shelter ทั้งหมด
         const count = (data || []).length;
         setShelterCount(count);
         console.log(`✅ Loaded ${count} shelters`);
@@ -84,8 +123,8 @@ export default function Page() {
     setCurrentTime(new Date());
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     
-    // ✅ เรียก loadShelterCount เมื่อ component mount
     loadShelterCount();
+    loadUserRole();
     
     loadData();
     const dataTimer = setInterval(loadData, 1000);
@@ -152,7 +191,6 @@ export default function Page() {
   };
 
   const stats = [
-    // ✅ เปลี่ยนจาก hardcode '15' เป็น dynamic shelterCount
     { 
       title: 'ศูนย์พักพิงทั้งหมด', 
       value: loadingShelters ? '-' : shelterCount.toString(), 
@@ -235,6 +273,12 @@ export default function Page() {
                 </div>
                 <div className="h-8 w-[1px] bg-slate-700 hidden sm:block"></div>
                 <div className="flex items-center gap-3 pl-2">
+                    {/* ✅ แสดง role ที่ได้รับ */}
+                    <div className="text-right hidden sm:block">
+                        <p className="text-xs text-slate-400">
+                          {userRole ? `👤 ${userRole}` : '⏳ Loading...'}
+                        </p>
+                    </div>
                     <Link href="/login" title="ไปยังหน้าเข้าสู่ระบบ" aria-label="ไปยังหน้าเข้าสู่ระบบ" className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center hover:ring-2 hover:ring-blue-500/30 transition-all cursor-pointer">
                         <Users className="w-5 h-5 text-slate-300" />
                     </Link>
@@ -371,7 +415,9 @@ export default function Page() {
                     </table>
                   </div>
                  </div>
-                 <NotificationPanel />
+                 
+                 {/* ✅ ตรวจสอบ role - ถ้าเป็น ADMIN เท่านั้นจึงแสดง NotificationPanel */}
+                 {userRole && userRole === 'ADMIN' && <NotificationPanel />}
               </div>
             </div>
         </main>
