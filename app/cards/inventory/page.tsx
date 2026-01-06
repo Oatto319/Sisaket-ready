@@ -9,7 +9,6 @@ import {
   Plus,
   Package,
   CheckCircle2,
-  FileSpreadsheet,
   CloudUpload,
   ListChecks,
   Download
@@ -26,23 +25,26 @@ export default function InventoryPage() {
   const [uploadMode, setUploadMode] = useState(false);
   const [excelPreview, setExcelPreview] = useState<any[]>([]);
 
+  // ปรับเปลี่ยน image เป็น path ของไฟล์ PNG
   const defaultInventory = [
-    { id: 1, name: 'น้ำดื่ม (แพ็ค)', stock: 500, limit: 50, image: '💧', unit: 'แพ็ค', category: 'อาหารและน้ำ' },
-    { id: 2, name: 'ข้าวสาร (5 กก.)', stock: 200, limit: 20, image: '🌾', unit: 'ถุง', category: 'อาหารและน้ำ' },
-    { id: 3, name: 'บะหมี่กึ่งสำเร็จรูป', stock: 1000, limit: 100, image: '🍜', unit: 'ลัง', category: 'อาหารและน้ำ' },
-    { id: 4, name: 'ปลากระป๋อง', stock: 800, limit: 100, image: '🐟', unit: 'แพ็ค', category: 'อาหารและน้ำ' },
-    { id: 5, name: 'ยาสามัญชุดเล็ก', stock: 150, limit: 10, image: '💊', unit: 'ชุด', category: 'ยารักษาโรค' },
-    { id: 6, name: 'ผ้าห่ม', stock: 300, limit: 50, image: '🧣', unit: 'ผืน', category: 'เครื่องนุ่งห่ม' },
-    { id: 7, name: 'สบู่/ยาสีฟัน', stock: 400, limit: 40, image: '🧼', unit: 'ชุด', category: 'ของใช้ทั่วไป' },
+    { id: 1, name: 'น้ำดื่ม (แพ็ค)', stock: 500, limit: 50, image: '/inventory/water.png', unit: 'แพ็ค', category: 'อาหารและน้ำ' },
+    { id: 2, name: 'ข้าวสาร (5 กก.)', stock: 200, limit: 20, image: '/inventory/rice.png', unit: 'ถุง', category: 'อาหารและน้ำ' },
+    { id: 3, name: 'บะหมี่กึ่งสำเร็จรูป', stock: 1000, limit: 100, image: '/inventory/noodle.png', unit: 'ลัง', category: 'อาหารและน้ำ' },
+    { id: 4, name: 'ปลากระป๋อง', stock: 800, limit: 100, image: '/inventory/fish.png', unit: 'แพ็ค', category: 'อาหารและน้ำ' },
+    { id: 5, name: 'ยาสามัญชุดเล็ก', stock: 150, limit: 10, image: '/inventory/med.png', unit: 'ชุด', category: 'ยารักษาโรค' },
+    { id: 6, name: 'ผ้าห่ม', stock: 300, limit: 50, image: '/inventory/blanket.png', unit: 'ผืน', category: 'เครื่องนุ่งห่ม' },
+    { id: 7, name: 'สบู่/ยาสีฟัน', stock: 400, limit: 40, image: '/inventory/soap.png', unit: 'ชุด', category: 'ของใช้ทั่วไป' },
   ];
 
   useEffect(() => {
     const loadInventory = () => {
-        const stored = localStorage.getItem('ems_inventory');
-        if (stored) setItems(JSON.parse(stored));
-        else {
-            localStorage.setItem('ems_inventory', JSON.stringify(defaultInventory));
-            setItems(defaultInventory);
+        if (typeof window !== 'undefined') {
+            const stored = localStorage.getItem('ems_inventory');
+            if (stored) setItems(JSON.parse(stored));
+            else {
+                localStorage.setItem('ems_inventory', JSON.stringify(defaultInventory));
+                setItems(defaultInventory);
+            }
         }
     };
     loadInventory();
@@ -106,15 +108,31 @@ export default function InventoryPage() {
 
   const filteredItems = items.filter(item => (activeCategory === 'ทั้งหมด' || item.category === activeCategory) && item.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
+  // Helper สำหรับ Render รูปภาพ
+  const RenderItemImage = ({ src, name, sizeClass = "w-12 h-12" }: { src: string, name: string, sizeClass?: string }) => {
+    const isPng = src.includes('.png') || src.includes('/');
+    return (
+      <div className={`${sizeClass} flex items-center justify-center bg-slate-800/50 rounded-2xl overflow-hidden shadow-inner border border-white/5 group-hover:scale-110 transition-transform`}>
+        {isPng ? (
+          <img src={src} alt={name} className="w-full h-full object-contain p-1" onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }} />
+        ) : (
+          <span className="text-3xl">{src}</span>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-[#0B1120] text-slate-100 font-sans p-6 sm:p-8">
       <div className="max-w-7xl mx-auto">
-        {/* Header - ขนาดกำลังดี */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-8">
           <div className="flex items-center gap-4">
             <button onClick={() => router.back()} className="p-2.5 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 transition-all"><ArrowLeft className="w-5 h-5" /></button>
             <div>
               <h1 className="text-2xl font-bold uppercase tracking-tight">คลังทรัพยากร</h1>
+              {/* แก้ไข <p> เป็น <div> เพื่อป้องกัน Hydration Error */}
               <div className="text-xs text-slate-400 font-medium flex items-center gap-2 mt-1">
                 <div className="w-2 h-2 rounded-full bg-emerald-500" /> ระบบสต็อกส่วนกลาง
               </div>
@@ -135,11 +153,10 @@ export default function InventoryPage() {
         </div>
 
         {!uploadMode ? (
-          /* สินค้า - 4 คอลัมน์ อ่านง่ายขึ้น */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredItems.map((item) => (
               <div key={item.id} className="bg-slate-900/40 border border-white/5 rounded-[2rem] p-5 hover:bg-slate-800/60 transition-all group">
-                 <div className="text-3xl mb-3 p-3 bg-slate-800/50 rounded-2xl w-fit group-hover:scale-110 transition-transform">{item.image}</div>
+                 <RenderItemImage src={item.image} name={item.name} sizeClass="w-16 h-16 mb-4" />
                  <h3 className="font-bold text-white text-base mb-1 truncate">{item.name}</h3>
                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-6">{item.category}</p>
                  <div className="flex items-center justify-between p-4 bg-slate-900/60 rounded-2xl border border-white/5">
@@ -153,9 +170,7 @@ export default function InventoryPage() {
             ))}
           </div>
         ) : (
-          /* โหมดนำเข้า - สัดส่วน 8:4 สมดุลขึ้น */
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in duration-300">
-             {/* ซ้าย: Preview */}
              <div className="lg:col-span-8 bg-slate-900/40 border border-white/5 rounded-[2.5rem] p-7">
                 <div className="flex justify-between items-center mb-6">
                    <div>
@@ -179,7 +194,7 @@ export default function InventoryPage() {
                     excelPreview.map((item, idx) => (
                       <div key={idx} className="flex justify-between items-center p-4 bg-slate-800/40 border border-white/5 rounded-2xl hover:bg-slate-800/60 transition-colors">
                         <div className="flex items-center gap-4">
-                           <span className="text-2xl">{item.image}</span>
+                           <RenderItemImage src={item.image} name={item.name} sizeClass="w-10 h-10" />
                            <div>
                               <p className="text-sm font-bold text-white">{item.name}</p>
                               <p className="text-[10px] text-slate-500 uppercase">{item.category}</p>
@@ -195,7 +210,6 @@ export default function InventoryPage() {
                 </div>
              </div>
 
-             {/* ขวา: อัปโหลด */}
              <div className="lg:col-span-4 space-y-4">
                 <div className="relative group border-2 border-dashed border-slate-700 hover:border-emerald-500 bg-slate-900/40 rounded-[2.5rem] p-10 transition-all flex flex-col items-center gap-5 text-center min-h-[250px] justify-center">
                    <input type="file" accept=".xlsx, .xls" onChange={(e) => e.target.files?.[0] && processExcel(e.target.files[0])} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
@@ -217,12 +231,11 @@ export default function InventoryPage() {
         )}
       </div>
 
-      {/* Modal เติมของ */}
       {showRestockModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
            <div className="bg-slate-900 border border-white/10 rounded-[2.5rem] p-8 w-full max-w-sm shadow-2xl">
               <div className="flex items-center gap-4 mb-8">
-                 <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-3xl border border-emerald-500/20 shadow-inner">{showRestockModal.image}</div>
+                 <RenderItemImage src={showRestockModal.image} name={showRestockModal.name} sizeClass="w-16 h-16" />
                  <div>
                     <h3 className="text-base font-black text-white uppercase tracking-tight">เติมสต๊อก</h3>
                     <p className="text-slate-400 text-xs font-medium">{showRestockModal.name}</p>
