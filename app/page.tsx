@@ -30,9 +30,29 @@ export default function Page() {
   const [pendingCount, setPendingCount] = useState(0);
   const [totalStock, setTotalStock] = useState(0);
   const [recentRequests, setRecentRequests] = useState<any[]>([]);
+  const [shelterCount, setShelterCount] = useState(0); // ✅ เพิ่ม state สำหรับจำนวนศูนย์
+  const [loadingShelters, setLoadingShelters] = useState(true); // ✅ loading state
   
   // Modal State
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
+
+  // ✅ ฟังก์ชันดึงจำนวนศูนย์พักพิง
+  const loadShelterCount = async () => {
+    try {
+      const response = await fetch('/api/centers');
+      if (response.ok) {
+        const data = await response.json();
+        // นับจำนวน shelter ทั้งหมด
+        const count = (data || []).length;
+        setShelterCount(count);
+        console.log(`✅ Loaded ${count} shelters`);
+      }
+    } catch (error) {
+      console.error('Failed to fetch shelter count:', error);
+    } finally {
+      setLoadingShelters(false);
+    }
+  };
 
   const loadData = () => {
     try {
@@ -63,9 +83,14 @@ export default function Page() {
   useEffect(() => {
     setCurrentTime(new Date());
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    
+    // ✅ เรียก loadShelterCount เมื่อ component mount
+    loadShelterCount();
+    
     loadData();
     const dataTimer = setInterval(loadData, 1000);
     window.addEventListener('storage', loadData);
+    
     return () => {
         clearInterval(timer);
         clearInterval(dataTimer);
@@ -127,10 +152,59 @@ export default function Page() {
   };
 
   const stats = [
-    { title: 'ศูนย์พักพิงทั้งหมด', value: '15', total: 'แห่ง', unit: '', icon: MapPin, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20 group-hover:border-blue-400 group-hover:bg-blue-500/10', trend: 'กดเพื่อดูรายชื่อ', trendUp: true, href: '/cards/shelter' },
-    { title: 'คำร้องขอ (รออนุมัติ)', value: pendingCount.toString(), total: 'รายการ', unit: '', icon: ClipboardList, color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20 group-hover:border-orange-400 group-hover:bg-orange-500/10', trend: 'รอการจัดการ', trendUp: pendingCount > 0, href: '/cards/request' },
-    { title: 'เบิกจ่ายสิ่งของ', value: 'สร้างใบเบิก', total: 'ใหม่', unit: '', icon: PackageMinus, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20 group-hover:border-emerald-400 group-hover:bg-emerald-500/10', trend: 'คลังหลักพร้อมจ่าย', trendUp: true, href: '/cards/requisition' },
-    { title: 'คลังสินค้าทั้งหมด', value: totalStock.toLocaleString(), total: 'ชิ้น', unit: '', icon: Package, color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20 group-hover:border-purple-400 group-hover:bg-purple-500/10', trend: 'ตรวจสอบสต๊อก', trendUp: true, href: '/cards/inventory' },
+    // ✅ เปลี่ยนจาก hardcode '15' เป็น dynamic shelterCount
+    { 
+      title: 'ศูนย์พักพิงทั้งหมด', 
+      value: loadingShelters ? '-' : shelterCount.toString(), 
+      total: 'แห่ง', 
+      unit: '', 
+      icon: MapPin, 
+      color: 'text-blue-400', 
+      bg: 'bg-blue-500/10', 
+      border: 'border-blue-500/20 group-hover:border-blue-400 group-hover:bg-blue-500/10', 
+      trend: 'กดเพื่อดูรายชื่อ', 
+      trendUp: true, 
+      href: '/cards/shelter' 
+    },
+    { 
+      title: 'คำร้องขอ (รออนุมัติ)', 
+      value: pendingCount.toString(), 
+      total: 'รายการ', 
+      unit: '', 
+      icon: ClipboardList, 
+      color: 'text-orange-400', 
+      bg: 'bg-orange-500/10', 
+      border: 'border-orange-500/20 group-hover:border-orange-400 group-hover:bg-orange-500/10', 
+      trend: 'รอการจัดการ', 
+      trendUp: pendingCount > 0, 
+      href: '/cards/request' 
+    },
+    { 
+      title: 'เบิกจ่ายสิ่งของ', 
+      value: 'สร้างใบเบิก', 
+      total: 'ใหม่', 
+      unit: '', 
+      icon: PackageMinus, 
+      color: 'text-emerald-400', 
+      bg: 'bg-emerald-500/10', 
+      border: 'border-emerald-500/20 group-hover:border-emerald-400 group-hover:bg-emerald-500/10', 
+      trend: 'คลังหลักพร้อมจ่าย', 
+      trendUp: true, 
+      href: '/cards/requisition' 
+    },
+    { 
+      title: 'คลังสินค้าทั้งหมด', 
+      value: totalStock.toLocaleString(), 
+      total: 'ชิ้น', 
+      unit: '', 
+      icon: Package, 
+      color: 'text-purple-400', 
+      bg: 'bg-purple-500/10', 
+      border: 'border-purple-500/20 group-hover:border-purple-400 group-hover:bg-purple-500/10', 
+      trend: 'ตรวจสอบสต๊อก', 
+      trendUp: true, 
+      href: '/cards/inventory' 
+    },
   ];
 
   return (
@@ -142,7 +216,7 @@ export default function Page() {
 
       <div className="relative z-10 flex flex-col h-screen overflow-hidden">
         
-        {/* --- Header (ตัด Search Bar ออกแล้ว) --- */}
+        {/* --- Header --- */}
         <header className="h-20 flex items-center justify-between px-8 bg-slate-900/40 backdrop-blur-md border-b border-slate-800/60 sticky top-0 z-20">
             <div className="flex items-center gap-3">
                 <div className="min-w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
