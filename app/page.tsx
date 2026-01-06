@@ -161,9 +161,9 @@ export default function Page() {
                 </div>
                 <div className="h-8 w-[1px] bg-slate-700 hidden sm:block"></div>
                 <div className="flex items-center gap-3 pl-2">
-                    <div className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center">
+                    <Link href="/login" title="ไปยังหน้าเข้าสู่ระบบ" aria-label="ไปยังหน้าเข้าสู่ระบบ" className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center hover:ring-2 hover:ring-blue-500/30 transition-all cursor-pointer">
                         <Users className="w-5 h-5 text-slate-300" />
-                    </div>
+                    </Link>
                 </div>
             </div>
         </header>
