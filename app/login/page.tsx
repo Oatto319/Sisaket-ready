@@ -57,7 +57,7 @@ export default function LoginPage() {
              <svg className="absolute inset-0 h-full w-full opacity-[0.03]" xmlns="http://www.w3.org/2000/svg"><pattern id="pattern" patternUnits="userSpaceOnUse" width="40" height="40" patternTransform="scale(2)"><rect width="100%" height="100%" fill="none"/><path d="M0 0h40v40H0z" fill="currentColor"/></pattern><rect width="100%" height="100%" fill="url(#pattern)"/></svg>
         </div>
         
-        <div className="relative z-10 flex h-full flex-col justify-between p-12 text-slate-900">
+        <div className="relative z-10 flex h-full flex-col justify-between p-12 text-slate-100">
           <div className="flex items-center gap-3">
              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-200">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-6 w-6"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>
@@ -71,7 +71,7 @@ export default function LoginPage() {
               </p>
             </blockquote>
           </div>
-          <p className="text-sm text-slate-400">© 2024 Sisaket Ready Team.</p>
+          <p className="text-sm text-slate-100">© 2024 Sisaket Ready Team.</p>
         </div>
       </div>
 
@@ -80,10 +80,10 @@ export default function LoginPage() {
         <div className="mx-auto w-full max-w-sm lg:w-96 bg-slate-900/50 rounded-2xl p-8 shadow-lg border border-slate-800">
           <div>
              
-            <h2 className="mt-6 text-3xl font-extrabold tracking-tight text-slate-900">
+            <h2 className="mt-6 text-3xl font-extrabold tracking-tight text-slate-100">
               ยินดีต้อนรับ
             </h2>
-            <p className="mt-2 text-sm text-slate-300">
+            <p className="mt-2 text-sm text-slate-100">
                เข้าสู่ระบบ
             </p>
           </div>
@@ -98,7 +98,7 @@ export default function LoginPage() {
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium leading-6 text-slate-700">
+                <label htmlFor="email" className="block text-sm font-medium leading-6 text-slate-100">
                   อีเมล
                 </label>
                 <div className={inputWrapperClass}>
@@ -120,7 +120,7 @@ export default function LoginPage() {
 
               <div>
                 <div className="flex items-center justify-between">
-                    <label htmlFor="password" className="block text-sm font-medium leading-6 text-slate-700">
+                    <label htmlFor="password" className="block text-sm font-medium leading-6 text-slate-100">
                     รหัสผ่าน
                     </label>
                     <div className="text-sm">
@@ -167,12 +167,12 @@ export default function LoginPage() {
               </div>
             </form>
 
-            <div className="mt-8 text-center text-sm text-slate-500">
-                 ยังไม่มีบัญชี?{' '}
-                 <Link href="/register" className="font-medium text-blue-400 hover:text-blue-300 transition-colors">
-                   สร้างบัญชี
-                 </Link>
-            </div>
+            <div className="mt-8 text-center text-sm text-slate-100">
+                  ยังไม่มีบัญชี?{' '}
+                  <Link href="/register" className="font-medium text-blue-400 hover:text-blue-300 transition-colors">
+                    สร้างบัญชี
+                  </Link>
+             </div>
           </div>
         </div>
       </div>
