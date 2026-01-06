@@ -68,6 +68,7 @@ export default function RequisitionPage() {
   const [selectedShelters, setSelectedShelters] = useState<string[]>([]);
   const [shelters, setShelters] = useState<Center[]>([]);
   const [loadingShelters, setLoadingShelters] = useState<boolean>(true);
+  const [totalSheltersCount, setTotalSheltersCount] = useState<number>(0); // ✅ จำนวนศูนย์ทั้งหมด
   const [cart, setCart] = useState<CartItem>({});
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
 
@@ -83,7 +84,7 @@ export default function RequisitionPage() {
     { id: 7, name: 'สบู่/ยาสีฟัน', stock: 400, limit: 40, image: '🧼', unit: 'ชุด', category: 'ของใช้ทั่วไป' },
   ];
 
-  // ดึงข้อมูลศูนย์จาก API
+  // ✅ ดึงข้อมูลศูนย์จาก API และอัปเดตจำนวน realtime
   useEffect(() => {
     const fetchShelters = async () => {
       try {
@@ -105,6 +106,7 @@ export default function RequisitionPage() {
           });
           
           setShelters(sheltersWithIds);
+          setTotalSheltersCount(sheltersWithIds.length); // ✅ บันทึกจำนวนศูนย์ทั้งหมด
         }
       } catch (e) {
         console.error('Failed to fetch shelters:', e);
@@ -112,7 +114,13 @@ export default function RequisitionPage() {
         setLoadingShelters(false);
       }
     };
+
+    // ✅ ดึงข้อมูลเป็นครั้งแรก
     fetchShelters();
+
+    // ✅ ตั้ง interval เพื่ออัปเดตข้อมูลเป็นระยะ (ทุก 10 วินาที)
+    const interval = setInterval(fetchShelters, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   // โหลด inventory จาก persistent storage
@@ -345,7 +353,16 @@ export default function RequisitionPage() {
                   เบิกจ่ายสิ่งของ
                 </h1>
                 <p className="text-sm text-slate-400">
-                  สร้างใบเบิกสำหรับศูนย์พักพิง ({selectedShelters.length} ศูนย์ที่เลือก)
+                  {/* ✅ อัปเดตให้แสดง realtime */}
+                  {step === 1 ? (
+                    <>
+                      มีทั้งสิ้น <span className="text-emerald-400 font-bold">{totalSheltersCount}</span> ศูนย์พักพิง ({selectedShelters.length} ที่เลือก)
+                    </>
+                  ) : (
+                    <>
+                      สร้างใบเบิกสำหรับศูนย์พักพิง ({selectedShelters.length} ศูนย์ที่เลือก)
+                    </>
+                  )}
                 </p>
               </div>
             </div>
