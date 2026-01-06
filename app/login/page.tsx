@@ -18,13 +18,41 @@ export default function LoginPage() {
     setError('');
   };
 
+  // ✅ ฟังก์ชันกำหนด role ตาม username
+  const getRoleByUsername = (username: string): string => {
+    if (username.toLowerCase() === 'admin') {
+      return 'ADMIN';
+    } else if (username.toLowerCase() === 'staff') {
+      return 'STAFF';
+    }
+    return 'USER';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
     try {
+      // ✅ เรียก login ผ่าน useAuth hook
       await login(formData.username, formData.password);
+      
+      // ✅ เก็บ role ลงใน localStorage
+      const userRole = getRoleByUsername(formData.username);
+      localStorage.setItem('userRole', userRole);
+      
+      // ✅ เก็บข้อมูล user object ด้วย
+      const userData = {
+        username: formData.username,
+        role: userRole,
+        loginTime: new Date().toISOString()
+      };
+      localStorage.setItem('user', JSON.stringify(userData));
+      
+      console.log(`✅ Login สำเร็จ - Role: ${userRole}`);
+      console.log(`📊 User data:`, userData);
+      
+      // ✅ Redirect ไปยัง dashboard
       router.push('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ไม่สามารถเข้าสู่ระบบได้');
