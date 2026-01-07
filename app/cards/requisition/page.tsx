@@ -75,8 +75,7 @@ export default function RequisitionPage() {
     loadInventory();
   }, []);
 
-  // ✅ แก้ไข Filter ตรงนี้ครับ (ที่ขึ้น Error ในรูปที่ 2)
-  // เพิ่มการเช็ค (s.name || "") เพื่อไม่ให้เป็น null ก่อนสั่ง .includes
+  // ✅ Filter สำหรับ Shelters
   const filteredShelters = shelters.filter(s => {
     const name = (s.name || "").toLowerCase();
     const district = (s.district || "").toLowerCase();
@@ -183,7 +182,8 @@ export default function RequisitionPage() {
     localStorage.setItem('ems_requests', JSON.stringify([...newRequests, ...existingRequests]));
     window.dispatchEvent(new Event('storage'));
 
-    alert('✅ บันทึกใบเบิกเรียบร้อยแล้ว!');
+    // ✅ ใช้ Unicode escape แทน emoji ตรงๆ
+    alert('\u2705 บันทึกใบเบิกเรียบร้อยแล้ว!');
     router.push('/');
   };
 
