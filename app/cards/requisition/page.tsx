@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import * as XLSX from 'xlsx';
 import {
   ArrowLeft, Search, Check, Package, MapPin, ChevronRight,
-  ShoppingCart, FileText, Trash2, CheckCircle2, XCircle,
-  FileSpreadsheet, CloudUpload, Settings2, PlusCircle, AlertCircle, ListChecks
+  ShoppingCart, XCircle, Trash2, CheckCircle2,
+  FileSpreadsheet, CloudUpload, Settings2, ListChecks
 } from 'lucide-react';
 
 interface Center {
@@ -75,6 +75,19 @@ export default function RequisitionPage() {
     loadInventory();
   }, []);
 
+  // ✅ แก้ไข Filter ตรงนี้ครับ (ที่ขึ้น Error ในรูปที่ 2)
+  // เพิ่มการเช็ค (s.name || "") เพื่อไม่ให้เป็น null ก่อนสั่ง .includes
+  const filteredShelters = shelters.filter(s => {
+    const name = (s.name || "").toLowerCase();
+    const district = (s.district || "").toLowerCase();
+    const search = (searchTerm || "").toLowerCase();
+    return name.includes(search) || district.includes(search);
+  });
+
+  const filteredInventory = inventory.filter(item => 
+    activeCategory === 'ทั้งหมด' || item.category === activeCategory
+  );
+
   // Excel Functions
   const processExcel = (file: File) => {
     const reader = new FileReader();
@@ -116,7 +129,7 @@ export default function RequisitionPage() {
     XLSX.writeFile(workbook, "Sample_Requisition.xlsx");
   };
 
-  const handleInputChange = (itemId: number, value: string, limit: number, stock: number) => {
+  const handleInputChange = (itemId: number, value: string, limit: number) => {
     const numValue = value === '' ? 0 : parseInt(value, 10);
     if (isNaN(numValue)) return;
     const safeValue = Math.max(0, Math.min(limit, numValue));
@@ -134,7 +147,6 @@ export default function RequisitionPage() {
     let updatedInventory = [...inventory];
     const newRequests: any[] = [];
 
-    // Check stock sufficiency
     for (const [itemId, qty] of Object.entries(cart)) {
       const totalNeeded = Number(qty) * shelterCount;
       const item = updatedInventory.find(i => i.id === Number(itemId));
@@ -144,7 +156,6 @@ export default function RequisitionPage() {
       }
     }
 
-    // Process each shelter
     selectedShelters.forEach(sId => {
       const shelter = shelters.find(s => String(s.id) === String(sId));
       Object.entries(cart).forEach(([itemId, qty]) => {
@@ -167,18 +178,14 @@ export default function RequisitionPage() {
       });
     });
 
-    // Save Data
     localStorage.setItem('ems_inventory', JSON.stringify(updatedInventory));
     const existingRequests = JSON.parse(localStorage.getItem('ems_requests') || '[]');
     localStorage.setItem('ems_requests', JSON.stringify([...newRequests, ...existingRequests]));
     window.dispatchEvent(new Event('storage'));
 
-    alert('บันทึกใบเบิกและส่งคำร้องเรียบร้อยแล้ว!');
+    alert('✅ บันทึกใบเบิกเรียบร้อยแล้ว!');
     router.push('/');
   };
-
-  const filteredShelters = shelters.filter(s => s.name.includes(searchTerm) || s.district.includes(searchTerm));
-  const filteredInventory = inventory.filter(item => activeCategory === 'ทั้งหมด' || item.category === activeCategory);
 
   return (
     <div className="min-h-screen bg-[#0B1120] text-slate-100 font-sans overflow-hidden flex flex-col relative">
@@ -216,7 +223,7 @@ export default function RequisitionPage() {
             <div className="h-full flex flex-col animate-in fade-in duration-300">
               <div className="relative mb-6 max-w-xl mx-auto w-full">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 w-5 h-5" />
-                <input type="text" placeholder="ค้นหาศูนย์พักพิง..." className="w-full bg-slate-900/60 border border-slate-700 rounded-2xl py-4 pl-12 text-white outline-none focus:ring-2 focus:ring-emerald-500/50" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <input type="text" placeholder="ค้นหาชื่อศูนย์ หรืออำเภอ..." className="w-full bg-slate-900/60 border border-slate-700 rounded-2xl py-4 pl-12 text-white outline-none focus:ring-2 focus:ring-emerald-500/50" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
               </div>
               <div className="flex-1 overflow-y-auto custom-scrollbar pb-32">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -225,8 +232,8 @@ export default function RequisitionPage() {
                        <div className={`w-6 h-6 rounded border flex items-center justify-center mb-3 transition-colors ${selectedShelters.includes(String(shelter.id)) ? 'bg-emerald-500 border-emerald-500' : 'border-slate-600'}`}>
                           {selectedShelters.includes(String(shelter.id)) && <Check className="w-4 h-4 text-white" />}
                        </div>
-                       <h3 className="font-bold text-slate-100">{shelter.name}</h3>
-                       <p className="text-xs text-slate-500 mt-1">{shelter.district}</p>
+                       <h3 className="font-bold text-slate-100">{shelter.name || "ไม่มีชื่อศูนย์"}</h3>
+                       <p className="text-xs text-slate-500 mt-1">{shelter.district || "ไม่ระบุอำเภอ"}</p>
                     </div>
                   ))}
                 </div>
@@ -257,19 +264,16 @@ export default function RequisitionPage() {
                                 <span className="text-2xl">{item.image}</span>
                                 <div className="text-right">
                                   <p className={`font-bold ${isOver ? 'text-red-400' : 'text-emerald-400'}`}>{item.stock}</p>
-                                  <p className="text-[9px] text-slate-500 font-bold">ในคลัง</p>
+                                  <p className="text-[9px] text-slate-500 font-bold uppercase">ในคลัง</p>
                                 </div>
                               </div>
                               <h3 className="text-white font-bold text-sm mb-1">{item.name}</h3>
                               <p className="text-[10px] text-slate-500 mb-4 tracking-wider uppercase">โควตา: {item.limit} {item.unit} / ที่</p>
-                              <input type="number" value={qty || ''} placeholder="0" onChange={(e) => handleInputChange(item.id, e.target.value, item.limit, item.stock)} className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 px-3 text-center text-white font-bold outline-none focus:border-emerald-500 transition-all" />
-                              
+                              <input type="number" value={qty || ''} placeholder="0" onChange={(e) => handleInputChange(item.id, e.target.value, item.limit)} className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 px-3 text-center text-white font-bold outline-none focus:border-emerald-500 transition-all" />
                               {qty > 0 && (
                                 <div className="mt-3 text-center animate-in slide-in-from-top-2 duration-200">
-                                   <p className={`text-[11px] font-black ${isOver ? 'text-red-400' : 'text-amber-500'}`}>
-                                      รวมเบิกทั้งสิ้น: {totalForAll} {item.unit}
-                                   </p>
-                                   {isOver && <p className="text-[9px] text-red-500 font-bold mt-1 animate-pulse">! สินค้าไม่พอเบิก</p>}
+                                   <p className={`text-[11px] font-black ${isOver ? 'text-red-400' : 'text-amber-500'}`}>รวมเบิกทั้งสิ้น: {totalForAll} {item.unit}</p>
+                                   {isOver && <p className="text-[9px] text-red-500 font-bold mt-1">! สินค้าไม่พอเบิก</p>}
                                 </div>
                               )}
                             </div>
@@ -299,21 +303,17 @@ export default function RequisitionPage() {
                   </div>
                 )}
               </div>
-              
               <div className="lg:col-span-4 flex flex-col h-full gap-5 pb-32">
                 {uploadMode ? (
                   <div className="space-y-4">
-                    <div className="relative border-2 border-dashed border-slate-700 rounded-[2rem] p-8 flex flex-col items-center gap-4 text-center hover:border-emerald-500/50 transition-all bg-slate-900/20 group">
+                    <div className="relative border-2 border-dashed border-slate-700 rounded-[2rem] p-8 flex flex-col items-center gap-4 text-center hover:border-emerald-500/50 transition-all bg-slate-900/20 group cursor-pointer">
                       <input type="file" accept=".xlsx, .xls" onChange={(e) => e.target.files?.[0] && processExcel(e.target.files[0])} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
-                      <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <CloudUpload className="w-8 h-8 text-emerald-400" />
-                      </div>
+                      <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><CloudUpload className="w-8 h-8 text-emerald-400" /></div>
                       <div>
                         <p className="text-sm font-bold text-white">เลือกไฟล์ Excel</p>
                         <p className="text-[10px] text-slate-500 mt-1 uppercase">รองรับ .xlsx, .xls</p>
                       </div>
                     </div>
-                    <button onClick={downloadSampleExcel} className="w-full py-3 bg-slate-800/40 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 border border-white/5 text-slate-400 hover:text-white transition-all"><FileSpreadsheet className="w-4 h-4" /> ดาวน์โหลดตัวอย่างไฟล์</button>
                   </div>
                 ) : (
                   <div className="flex-1 flex flex-col bg-slate-900/40 border border-white/5 rounded-[2rem] overflow-hidden">
@@ -336,9 +336,7 @@ export default function RequisitionPage() {
                                     <p className="text-[10px] text-emerald-400 font-bold">{qty} {item?.unit} / ศูนย์</p>
                                  </div>
                               </div>
-                              <button onClick={() => { const newCart = {...cart}; delete newCart[Number(id)]; setCart(newCart); }} className="p-2 text-slate-600 hover:text-red-400 transition-colors">
-                                <XCircle className="w-4 h-4" />
-                              </button>
+                              <button onClick={() => { const newCart = {...cart}; delete newCart[Number(id)]; setCart(newCart); }} className="p-2 text-slate-600 hover:text-red-400 transition-colors"><XCircle className="w-4 h-4" /></button>
                             </div>
                           )
                         })
@@ -353,23 +351,21 @@ export default function RequisitionPage() {
           {step === 3 && (
             <div className="h-full overflow-y-auto pb-32 animate-in zoom-in-95 duration-300">
                <div className="text-center py-12">
-                  <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/20 shadow-2xl">
-                    <CheckCircle2 className="w-10 h-10 text-emerald-500" />
-                  </div>
+                  <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/20 shadow-2xl"><CheckCircle2 className="w-10 h-10 text-emerald-500" /></div>
                   <h2 className="text-3xl font-black text-white uppercase">ยืนยันใบเบิกจ่าย</h2>
-                  <p className="text-slate-500 text-sm mt-2">ตรวจสอบรายการเบิกสุทธิสำหรับ {selectedShelters.length} ศูนย์</p>
+                  <p className="text-slate-500 text-sm mt-2">ตรวจสอบรายการเบิกสำหรับ {selectedShelters.length} ศูนย์</p>
                </div>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto px-4">
                   <div className="bg-slate-900/40 border border-white/5 p-8 rounded-[2.5rem]">
-                     <h4 className="text-[10px] font-black uppercase text-slate-500 mb-6 flex items-center gap-2"><MapPin className="w-4 h-4 text-emerald-500" /> ศูนย์ปลายทาง ({selectedShelters.length})</h4>
+                     <h4 className="text-[10px] font-black uppercase text-slate-500 mb-6 flex items-center gap-2"><MapPin className="w-4 h-4 text-emerald-500" /> ศูนย์ปลายทาง</h4>
                      <div className="space-y-2">
                         {selectedShelters.map(id => (
-                          <div key={id} className="text-sm font-bold bg-white/5 p-3 rounded-xl text-slate-300 border border-white/5">{shelters.find(s => String(s.id) === id)?.name}</div>
+                          <div key={id} className="text-sm font-bold bg-white/5 p-3 rounded-xl text-slate-300 border border-white/5">{shelters.find(s => String(s.id) === id)?.name || "ศูนย์ไม่ระบุชื่อ"}</div>
                         ))}
                      </div>
                   </div>
                   <div className="bg-slate-900/40 border border-white/5 p-8 rounded-[2.5rem]">
-                     <h4 className="text-[10px] font-black uppercase text-slate-500 mb-6 flex items-center gap-2"><Package className="w-4 h-4 text-blue-500" /> ยอดเบิกสุทธิรวม</h4>
+                     <h4 className="text-[10px] font-black uppercase text-slate-500 mb-6 flex items-center gap-2"><Package className="w-4 h-4 text-blue-500" /> ยอดเบิกสุทธิ</h4>
                      <div className="space-y-3">
                         {Object.entries(cart).map(([id, qty]) => {
                           const item = inventory.find(i => i.id === Number(id));
@@ -387,7 +383,6 @@ export default function RequisitionPage() {
           )}
         </div>
 
-        {/* Action Buttons */}
         <div className="fixed bottom-10 right-10 flex gap-3 z-[100]">
           {step > 1 && (
             <button onClick={() => {setStep(1); setCart({}); setSelectedShelters([]);}} className="p-4 bg-slate-800/80 rounded-2xl border border-white/5 hover:bg-red-500/20 text-slate-500 hover:text-red-500 transition-all shadow-2xl backdrop-blur-md">
