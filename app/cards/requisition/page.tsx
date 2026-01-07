@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { initializeInventory } from '@/lib/inventory-init';
 import * as XLSX from 'xlsx';
 import {
   ArrowLeft, Search, Check, Package, MapPin, ChevronRight,
@@ -38,10 +39,10 @@ export default function RequisitionPage() {
   const [step, setStep] = useState<number>(1);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [activeCategory, setActiveCategory] = useState<string>('ทั้งหมด');
-  
-  const [uploadMode, setUploadMode] = useState<boolean>(false); 
-  const [excelPreview, setExcelPreview] = useState<InventoryItem[]>([]); 
-  
+
+  const [uploadMode, setUploadMode] = useState<boolean>(false);
+  const [excelPreview, setExcelPreview] = useState<InventoryItem[]>([]);
+
   const [selectedShelters, setSelectedShelters] = useState<string[]>([]);
   const [shelters, setShelters] = useState<Center[]>([]);
   const [loadingShelters, setLoadingShelters] = useState<boolean>(true);
@@ -49,6 +50,11 @@ export default function RequisitionPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
 
   const categories = ['ทั้งหมด', 'อาหารและน้ำ', 'ยารักษาโรค', 'เครื่องนุ่งห่ม', 'ของใช้ทั่วไป'];
+
+  // ✅ เพิ่ม useEffect เพื่อ initialize inventory
+  useEffect(() => {
+    initializeInventory();
+  }, []);
 
   useEffect(() => {
     const fetchShelters = async () => {
@@ -83,7 +89,7 @@ export default function RequisitionPage() {
     return name.includes(search) || district.includes(search);
   });
 
-  const filteredInventory = inventory.filter(item => 
+  const filteredInventory = inventory.filter(item =>
     activeCategory === 'ทั้งหมด' || item.category === activeCategory
   );
 
@@ -162,7 +168,7 @@ export default function RequisitionPage() {
         if (shelter && idx !== -1) {
           const item = updatedInventory[idx];
           updatedInventory[idx].stock -= Number(qty);
-          
+
           newRequests.push({
             id: `REQ-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
             item: item.name,
@@ -229,11 +235,11 @@ export default function RequisitionPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {filteredShelters.map((shelter) => (
                     <div key={shelter.id} onClick={() => setSelectedShelters(prev => prev.includes(String(shelter.id)) ? prev.filter(id => id !== String(shelter.id)) : [...prev, String(shelter.id)])} className={`cursor-pointer p-5 rounded-2xl border transition-all ${selectedShelters.includes(String(shelter.id)) ? 'bg-emerald-500/10 border-emerald-500 shadow-lg shadow-emerald-500/5' : 'bg-slate-900/40 border-slate-800 hover:border-slate-600'}`}>
-                       <div className={`w-6 h-6 rounded border flex items-center justify-center mb-3 transition-colors ${selectedShelters.includes(String(shelter.id)) ? 'bg-emerald-500 border-emerald-500' : 'border-slate-600'}`}>
-                          {selectedShelters.includes(String(shelter.id)) && <Check className="w-4 h-4 text-white" />}
-                       </div>
-                       <h3 className="font-bold text-slate-100">{shelter.name || "ไม่มีชื่อศูนย์"}</h3>
-                       <p className="text-xs text-slate-500 mt-1">{shelter.district || "ไม่ระบุอำเภอ"}</p>
+                      <div className={`w-6 h-6 rounded border flex items-center justify-center mb-3 transition-colors ${selectedShelters.includes(String(shelter.id)) ? 'bg-emerald-500 border-emerald-500' : 'border-slate-600'}`}>
+                        {selectedShelters.includes(String(shelter.id)) && <Check className="w-4 h-4 text-white" />}
+                      </div>
+                      <h3 className="font-bold text-slate-100">{shelter.name || "ไม่มีชื่อศูนย์"}</h3>
+                      <p className="text-xs text-slate-500 mt-1">{shelter.district || "ไม่ระบุอำเภอ"}</p>
                     </div>
                   ))}
                 </div>
@@ -272,8 +278,8 @@ export default function RequisitionPage() {
                               <input type="number" value={qty || ''} placeholder="0" onChange={(e) => handleInputChange(item.id, e.target.value, item.limit)} className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 px-3 text-center text-white font-bold outline-none focus:border-emerald-500 transition-all" />
                               {qty > 0 && (
                                 <div className="mt-3 text-center animate-in slide-in-from-top-2 duration-200">
-                                   <p className={`text-[11px] font-black ${isOver ? 'text-red-400' : 'text-amber-500'}`}>รวมเบิกทั้งสิ้น: {totalForAll} {item.unit}</p>
-                                   {isOver && <p className="text-[9px] text-red-500 font-bold mt-1">! สินค้าไม่พอเบิก</p>}
+                                  <p className={`text-[11px] font-black ${isOver ? 'text-red-400' : 'text-amber-500'}`}>รวมเบิกทั้งสิ้น: {totalForAll} {item.unit}</p>
+                                  {isOver && <p className="text-[9px] text-red-500 font-bold mt-1">! สินค้าไม่พอเบิก</p>}
                                 </div>
                               )}
                             </div>
@@ -318,8 +324,8 @@ export default function RequisitionPage() {
                 ) : (
                   <div className="flex-1 flex flex-col bg-slate-900/40 border border-white/5 rounded-[2rem] overflow-hidden">
                     <div className="p-4 border-b border-white/5 bg-white/5 flex justify-between items-center">
-                       <h3 className="text-xs font-black uppercase text-slate-400 flex items-center gap-2"><ShoppingCart className="w-4 h-4 text-emerald-500" /> ตะกร้าสินค้า</h3>
-                       <span className="text-[10px] font-bold bg-slate-800 px-2 py-0.5 rounded text-emerald-400">{Object.keys(cart).length}</span>
+                      <h3 className="text-xs font-black uppercase text-slate-400 flex items-center gap-2"><ShoppingCart className="w-4 h-4 text-emerald-500" /> ตะกร้าสินค้า</h3>
+                      <span className="text-[10px] font-bold bg-slate-800 px-2 py-0.5 rounded text-emerald-400">{Object.keys(cart).length}</span>
                     </div>
                     <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
                       {Object.entries(cart).length === 0 ? (
@@ -330,13 +336,13 @@ export default function RequisitionPage() {
                           return (
                             <div key={id} className="flex justify-between items-center p-3 bg-slate-800/30 rounded-2xl border border-white/5">
                               <div className="flex items-center gap-3">
-                                 <span className="text-xl">{item?.image}</span>
-                                 <div>
-                                    <p className="text-xs font-bold text-white">{item?.name}</p>
-                                    <p className="text-[10px] text-emerald-400 font-bold">{qty} {item?.unit} / ศูนย์</p>
-                                 </div>
+                                <span className="text-xl">{item?.image}</span>
+                                <div>
+                                  <p className="text-xs font-bold text-white">{item?.name}</p>
+                                  <p className="text-[10px] text-emerald-400 font-bold">{qty} {item?.unit} / ศูนย์</p>
+                                </div>
                               </div>
-                              <button onClick={() => { const newCart = {...cart}; delete newCart[Number(id)]; setCart(newCart); }} className="p-2 text-slate-600 hover:text-red-400 transition-colors"><XCircle className="w-4 h-4" /></button>
+                              <button onClick={() => { const newCart = { ...cart }; delete newCart[Number(id)]; setCart(newCart); }} className="p-2 text-slate-600 hover:text-red-400 transition-colors"><XCircle className="w-4 h-4" /></button>
                             </div>
                           )
                         })
@@ -350,46 +356,46 @@ export default function RequisitionPage() {
 
           {step === 3 && (
             <div className="h-full overflow-y-auto pb-32 animate-in zoom-in-95 duration-300">
-               <div className="text-center py-12">
-                  <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/20 shadow-2xl"><CheckCircle2 className="w-10 h-10 text-emerald-500" /></div>
-                  <h2 className="text-3xl font-black text-white uppercase">ยืนยันใบเบิกจ่าย</h2>
-                  <p className="text-slate-500 text-sm mt-2">ตรวจสอบรายการเบิกสำหรับ {selectedShelters.length} ศูนย์</p>
-               </div>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto px-4">
-                  <div className="bg-slate-900/40 border border-white/5 p-8 rounded-[2.5rem]">
-                     <h4 className="text-[10px] font-black uppercase text-slate-500 mb-6 flex items-center gap-2"><MapPin className="w-4 h-4 text-emerald-500" /> ศูนย์ปลายทาง</h4>
-                     <div className="space-y-2">
-                        {selectedShelters.map(id => (
-                          <div key={id} className="text-sm font-bold bg-white/5 p-3 rounded-xl text-slate-300 border border-white/5">{shelters.find(s => String(s.id) === id)?.name || "ศูนย์ไม่ระบุชื่อ"}</div>
-                        ))}
-                     </div>
+              <div className="text-center py-12">
+                <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/20 shadow-2xl"><CheckCircle2 className="w-10 h-10 text-emerald-500" /></div>
+                <h2 className="text-3xl font-black text-white uppercase">ยืนยันใบเบิกจ่าย</h2>
+                <p className="text-slate-500 text-sm mt-2">ตรวจสอบรายการเบิกสำหรับ {selectedShelters.length} ศูนย์</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto px-4">
+                <div className="bg-slate-900/40 border border-white/5 p-8 rounded-[2.5rem]">
+                  <h4 className="text-[10px] font-black uppercase text-slate-500 mb-6 flex items-center gap-2"><MapPin className="w-4 h-4 text-emerald-500" /> ศูนย์ปลายทาง</h4>
+                  <div className="space-y-2">
+                    {selectedShelters.map(id => (
+                      <div key={id} className="text-sm font-bold bg-white/5 p-3 rounded-xl text-slate-300 border border-white/5">{shelters.find(s => String(s.id) === id)?.name || "ศูนย์ไม่ระบุชื่อ"}</div>
+                    ))}
                   </div>
-                  <div className="bg-slate-900/40 border border-white/5 p-8 rounded-[2.5rem]">
-                     <h4 className="text-[10px] font-black uppercase text-slate-500 mb-6 flex items-center gap-2"><Package className="w-4 h-4 text-blue-500" /> ยอดเบิกสุทธิ</h4>
-                     <div className="space-y-3">
-                        {Object.entries(cart).map(([id, qty]) => {
-                          const item = inventory.find(i => i.id === Number(id));
-                          return (
-                            <div key={id} className="flex justify-between items-center bg-emerald-500/5 p-4 rounded-2xl border border-emerald-500/10">
-                               <span className="text-sm font-bold text-slate-200">{item?.name}</span>
-                               <span className="text-emerald-400 font-mono text-lg font-black">{Number(qty) * selectedShelters.length} <span className="text-[10px] font-sans text-slate-500 uppercase">{item?.unit}</span></span>
-                            </div>
-                          );
-                        })}
-                     </div>
+                </div>
+                <div className="bg-slate-900/40 border border-white/5 p-8 rounded-[2.5rem]">
+                  <h4 className="text-[10px] font-black uppercase text-slate-500 mb-6 flex items-center gap-2"><Package className="w-4 h-4 text-blue-500" /> ยอดเบิกสุทธิ</h4>
+                  <div className="space-y-3">
+                    {Object.entries(cart).map(([id, qty]) => {
+                      const item = inventory.find(i => i.id === Number(id));
+                      return (
+                        <div key={id} className="flex justify-between items-center bg-emerald-500/5 p-4 rounded-2xl border border-emerald-500/10">
+                          <span className="text-sm font-bold text-slate-200">{item?.name}</span>
+                          <span className="text-emerald-400 font-mono text-lg font-black">{Number(qty) * selectedShelters.length} <span className="text-[10px] font-sans text-slate-500 uppercase">{item?.unit}</span></span>
+                        </div>
+                      );
+                    })}
                   </div>
-               </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
 
         <div className="fixed bottom-10 right-10 flex gap-3 z-[100]">
           {step > 1 && (
-            <button onClick={() => {setStep(1); setCart({}); setSelectedShelters([]);}} className="p-4 bg-slate-800/80 rounded-2xl border border-white/5 hover:bg-red-500/20 text-slate-500 hover:text-red-500 transition-all shadow-2xl backdrop-blur-md">
+            <button onClick={() => { setStep(1); setCart({}); setSelectedShelters([]); }} className="p-4 bg-slate-800/80 rounded-2xl border border-white/5 hover:bg-red-500/20 text-slate-500 hover:text-red-500 transition-all shadow-2xl backdrop-blur-md">
               <Trash2 className="w-6 h-6" />
             </button>
           )}
-          <button 
+          <button
             onClick={() => {
               if (step === 1 && selectedShelters.length > 0) setStep(2);
               else if (step === 2 && Object.keys(cart).length > 0) setStep(3);
@@ -398,8 +404,8 @@ export default function RequisitionPage() {
             disabled={(step === 1 && selectedShelters.length === 0) || (step === 2 && Object.keys(cart).length === 0)}
             className={`px-10 py-4 rounded-2xl font-black flex items-center gap-3 transition-all shadow-2xl ${(step === 1 && selectedShelters.length === 0) || (step === 2 && Object.keys(cart).length === 0) ? 'bg-slate-800 text-slate-600' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20'}`}
           >
-             <span className="text-sm uppercase tracking-widest">{step === 3 ? 'ยืนยันการเบิก' : 'ถัดไป'}</span>
-             <ChevronRight className="w-5 h-5" />
+            <span className="text-sm uppercase tracking-widest">{step === 3 ? 'ยืนยันการเบิก' : 'ถัดไป'}</span>
+            <ChevronRight className="w-5 h-5" />
           </button>
         </div>
       </div>
