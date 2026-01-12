@@ -37,60 +37,29 @@ export default function Page() {
   // Modal State
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
 
-  // ✅ ฟังก์ชันดึง role จาก localStorage
   const loadUserRole = () => {
     try {
-      // 🟢 วิธีที่ 1: ดึงจาก localStorage.userRole
       const storedRole = localStorage.getItem('userRole');
-      
       if (storedRole) {
-        const normalizedRole = String(storedRole).toUpperCase().trim();
-        setUserRole(normalizedRole);
-        console.log(`✅ Role loaded: ${normalizedRole}`);
+        setUserRole(String(storedRole).toUpperCase().trim());
         return;
       }
-
-      // 🟢 วิธีที่ 2: ดึงจาก localStorage.user object
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
-        try {
-          const userObj = JSON.parse(storedUser);
-          const roleFields = ['role', 'userRole', 'type'];
-          
-          for (const field of roleFields) {
-            if (userObj[field]) {
-              const normalizedRole = String(userObj[field]).toUpperCase().trim();
-              setUserRole(normalizedRole);
-              console.log(`✅ Role loaded from user object: ${normalizedRole}`);
-              return;
-            }
-          }
-        } catch (e) {
-          console.log('⚠️ Could not parse user object');
-        }
+        const userObj = JSON.parse(storedUser);
+        setUserRole(String(userObj.role || userObj.userRole).toUpperCase());
       }
-
-      console.log('⚠️ No role found in localStorage');
-    } catch (error) {
-      console.error('Error loading user role:', error);
-    }
+    } catch (e) { console.log(e); }
   };
 
-  // ✅ ฟังก์ชันดึงจำนวนศูนย์พักพิง
   const loadShelterCount = async () => {
     try {
       const response = await fetch('/api/centers');
       if (response.ok) {
         const data = await response.json();
-        const count = (data || []).length;
-        setShelterCount(count);
-        console.log(`✅ Loaded ${count} shelters`);
+        setShelterCount((data || []).length);
       }
-    } catch (error) {
-      console.error('Failed to fetch shelter count:', error);
-    } finally {
-      setLoadingShelters(false);
-    }
+    } catch (error) { console.error(error); } finally { setLoadingShelters(false); }
   };
 
   const loadData = () => {
@@ -98,86 +67,51 @@ export default function Page() {
         const storedRequests = localStorage.getItem('ems_requests');
         if (storedRequests) {
             const requests = JSON.parse(storedRequests);
-            const pending = requests.filter((r: any) => r.status === 'PENDING').length;
-            setPendingCount(pending);
+            setPendingCount(requests.filter((r: any) => r.status === 'PENDING').length);
             setRecentRequests(requests.slice(0, 10)); 
-        } else {
-            setPendingCount(0);
-            setRecentRequests([]);
         }
-
         const storedInv = localStorage.getItem('ems_inventory');
         if (storedInv) {
             const items = JSON.parse(storedInv);
-            const total = items.reduce((sum: number, item: any) => sum + item.stock, 0);
-            setTotalStock(total);
-        } else {
-            setTotalStock(0);
+            setTotalStock(items.reduce((sum: number, item: any) => sum + item.stock, 0));
         }
-    } catch (error) {
-        console.error("Data load error:", error);
-    }
+    } catch (e) { console.error(e); }
   };
 
   useEffect(() => {
     setCurrentTime(new Date());
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    
     loadShelterCount();
     loadUserRole();
-    
     loadData();
     const dataTimer = setInterval(loadData, 1000);
     window.addEventListener('storage', loadData);
-    
-    return () => {
-        clearInterval(timer);
-        clearInterval(dataTimer);
-        window.removeEventListener('storage', loadData);
-    };
+    return () => { clearInterval(timer); clearInterval(dataTimer); window.removeEventListener('storage', loadData); };
   }, []);
 
   const getItemIcon = (itemName: string) => {
     if (itemName.includes('น้ำ')) return '💧';
     if (itemName.includes('ข้าว')) return '🌾';
-    if (itemName.includes('บะหมี่')) return '🍜';
-    if (itemName.includes('ปลา')) return '🐟';
     if (itemName.includes('ยา')) return '💊';
-    if (itemName.includes('ผ้าห่ม')) return '🧣';
-    if (itemName.includes('เต็นท์')) return '⛺';
-    if (itemName.includes('ไฟฉาย')) return '🔦';
     return '📦';
   };
 
   const handleCancelRequest = (id: any) => {
     if(!confirm('ยืนยันการยกเลิกคำร้องขอนี้?')) return;
-    const target = recentRequests.find(r => r.id === id);
-    if (!target) return;
-    if (target.status === 'PENDING') {
-        const storedInv = localStorage.getItem('ems_inventory');
-        if (storedInv) {
-            const inventory = JSON.parse(storedInv);
-            const itemIndex = inventory.findIndex((i: any) => i.id === target.itemId || i.name === target.item);
-            if (itemIndex !== -1) {
-                inventory[itemIndex].stock += target.quantity;
-                localStorage.setItem('ems_inventory', JSON.stringify(inventory));
-            }
-        }
-    }
     const allRequests = JSON.parse(localStorage.getItem('ems_requests') || '[]');
     const newAllRequests = allRequests.filter((r: any) => r.id !== id);
     localStorage.setItem('ems_requests', JSON.stringify(newAllRequests));
     loadData();
-    window.dispatchEvent(new Event('storage'));
     setSelectedRequest(null);
   };
 
+  // ✅ New Color Palette Logic for White-Blue Theme
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'PENDING': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-      case 'APPROVED': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-      case 'REJECTED': return 'bg-red-500/20 text-red-400 border-red-500/30';
-      default: return 'bg-slate-700 text-slate-300';
+      case 'PENDING': return 'bg-amber-50 text-amber-600 border-amber-200';
+      case 'APPROVED': return 'bg-emerald-50 text-emerald-600 border-emerald-200';
+      case 'REJECTED': return 'bg-rose-50 text-rose-600 border-rose-200';
+      default: return 'bg-slate-50 text-slate-600 border-slate-200';
     }
   };
 
@@ -195,297 +129,234 @@ export default function Page() {
       title: 'ศูนย์พักพิงทั้งหมด', 
       value: loadingShelters ? '-' : shelterCount.toString(), 
       total: 'แห่ง', 
-      unit: '', 
       icon: MapPin, 
-      color: 'text-blue-400', 
-      bg: 'bg-blue-500/10', 
-      border: 'border-blue-500/20 group-hover:border-blue-400 group-hover:bg-blue-500/10', 
+      color: 'text-blue-600', 
+      bg: 'bg-blue-50', 
+      border: 'border-blue-100 hover:border-blue-300', 
       trend: 'กดเพื่อดูรายชื่อ', 
-      trendUp: true, 
       href: '/cards/shelter' 
     },
     { 
       title: 'คำร้องขอ (รออนุมัติ)', 
       value: pendingCount.toString(), 
       total: 'รายการ', 
-      unit: '', 
       icon: ClipboardList, 
-      color: 'text-orange-400', 
-      bg: 'bg-orange-500/10', 
-      border: 'border-orange-500/20 group-hover:border-orange-400 group-hover:bg-orange-500/10', 
+      color: 'text-indigo-600', 
+      bg: 'bg-indigo-50', 
+      border: 'border-indigo-100 hover:border-indigo-300', 
       trend: 'รอการจัดการ', 
-      trendUp: pendingCount > 0, 
       href: '/cards/request' 
     },
     { 
       title: 'เบิกจ่ายสิ่งของ', 
       value: 'สร้างใบเบิก', 
       total: 'ใหม่', 
-      unit: '', 
       icon: PackageMinus, 
-      color: 'text-emerald-400', 
-      bg: 'bg-emerald-500/10', 
-      border: 'border-emerald-500/20 group-hover:border-emerald-400 group-hover:bg-emerald-500/10', 
+      color: 'text-sky-600', 
+      bg: 'bg-sky-50', 
+      border: 'border-sky-100 hover:border-sky-300', 
       trend: 'คลังหลักพร้อมจ่าย', 
-      trendUp: true, 
       href: '/cards/requisition' 
     },
     { 
       title: 'คลังสินค้าทั้งหมด', 
       value: totalStock.toLocaleString(), 
       total: 'ชิ้น', 
-      unit: '', 
       icon: Package, 
-      color: 'text-purple-400', 
-      bg: 'bg-purple-500/10', 
-      border: 'border-purple-500/20 group-hover:border-purple-400 group-hover:bg-purple-500/10', 
+      color: 'text-blue-700', 
+      bg: 'bg-blue-100', 
+      border: 'border-blue-200 hover:border-blue-400', 
       trend: 'ตรวจสอบสต๊อก', 
-      trendUp: true, 
       href: '/cards/inventory' 
     },
   ];
 
   return (
-    <div className="min-h-screen bg-[#0B1120] text-slate-100 font-sans selection:bg-blue-500/30">
-      <div className="fixed inset-0 z-0 pointer-events-none">
-         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/20 rounded-full blur-[120px]" />
-         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 rounded-full blur-[120px]" />
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 font-sans selection:bg-blue-100 selection:text-blue-700">
+      
+      {/* Background Accent */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+         <div className="absolute top-[-5%] right-[-5%] w-[30%] h-[30%] bg-blue-100/50 rounded-full blur-[100px]" />
+         <div className="absolute bottom-[-5%] left-[-5%] w-[20%] h-[20%] bg-indigo-100/40 rounded-full blur-[80px]" />
       </div>
 
       <div className="relative z-10 flex flex-col h-screen overflow-hidden">
         
-        {/* --- Header --- */}
-        <header className="h-20 flex items-center justify-between px-8 bg-slate-900/40 backdrop-blur-md border-b border-slate-800/60 sticky top-0 z-20">
+        {/* --- Header (Clean White & Blue) --- */}
+        <header className="h-16 flex items-center justify-between px-8 bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-20 shadow-sm">
             <div className="flex items-center gap-3">
-                <div className="min-w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-                    <Activity className="w-6 h-6 text-white" />
+                <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center shadow-md shadow-blue-200">
+                    <Activity className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                    <h1 className="font-bold text-lg tracking-tight text-white leading-none">SISAKET<br/><span className="text-blue-400 text-sm font-medium">READY SYSTEM</span></h1>
+                    <h1 className="font-extrabold text-base tracking-tight text-slate-900 leading-none">SISAKET<br/><span className="text-blue-600 text-[10px] font-bold uppercase tracking-widest">Ready System</span></h1>
                 </div>
             </div>
 
             <div className="flex items-center gap-6">
                 <div className="text-right hidden sm:block">
-                    <p className="text-xl font-mono font-bold text-white tabular-nums leading-none mt-1">
+                    <p className="text-lg font-semibold text-slate-700 tabular-nums">
                         {currentTime ? currentTime.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                     </p>
                 </div>
-                <div className="h-8 w-[1px] bg-slate-700 hidden sm:block"></div>
-                <div className="flex items-center gap-3 pl-2">
-                    {/* ✅ แสดง role ที่ได้รับ */}
+                <div className="h-6 w-[1px] bg-slate-200 hidden sm:block"></div>
+                <div className="flex items-center gap-3">
                     <div className="text-right hidden sm:block">
-                        <p className="text-xs text-slate-400">
-                          {userRole ? `👤 ${userRole}` : '⏳ Loading...'}
+                        <p className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                          {userRole || 'GUEST'}
                         </p>
                     </div>
-                    <Link href="/login" title="ไปยังหน้าเข้าสู่ระบบ" aria-label="ไปยังหน้าเข้าสู่ระบบ" className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center hover:ring-2 hover:ring-blue-500/30 transition-all cursor-pointer">
-                        <Users className="w-5 h-5 text-slate-300" />
+                    <Link href="/login" className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center hover:bg-white hover:shadow-md transition-all">
+                        <User className="w-4 h-4 text-slate-600" />
                     </Link>
                 </div>
             </div>
         </header>
 
         {/* --- Main Content --- */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth custom-scrollbar">
+        <main className="flex-1 overflow-y-auto p-6 lg:p-10 custom-scrollbar">
             <div className="max-w-7xl mx-auto space-y-8">
-              <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                <div>
-                  <h2 className="text-3xl font-bold text-white tracking-tight">ศูนย์สั่งการ</h2>
-                  <p className="text-slate-400 mt-1">ภาพรวมสถานการณ์จังหวัดศรีสะเกษ</p>
-                </div>
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">ศูนย์สั่งการดิจิทัล</h2>
+                <p className="text-slate-500 text-sm">Dashboard สรุปทรัพยากรและการช่วยเหลือ</p>
               </div>
 
               {/* Stats Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-                {stats.map((stat, i) => {
-                  const CardContent = () => (
-                    <>
-                      <div className="absolute top-0 right-0 p-4 opacity-50">
-                        <stat.icon className={`w-16 h-16 ${stat.color} opacity-10 -rotate-12 transform group-hover:scale-110 transition-transform`} />
-                      </div>
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className={`p-2.5 rounded-lg ${stat.bg} ${stat.color}`}>
-                          <stat.icon className="w-6 h-6" />
-                        </div>
-                        <span className="text-slate-400 font-medium text-sm">{stat.title}</span>
-                      </div>
-                      <div className="flex items-baseline gap-2">
-                        <h3 className="text-3xl font-bold text-white font-mono">{stat.value}</h3>
-                        <span className="text-slate-500 text-sm">{stat.unit ? `/ ${stat.total} ${stat.unit}` : stat.total}</span>
-                      </div>
-                      <div className={`mt-4 flex items-center gap-2 text-xs font-medium ${stat.href ? 'text-blue-400' : (stat.trendUp ? 'text-emerald-400' : 'text-rose-400')}`}>
-                        {stat.href ? (
-                          <div className="flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                             <span className="underline decoration-blue-500/30 underline-offset-2">{stat.trend}</span> 
-                             <ChevronRight className="w-3 h-3" />
-                          </div>
-                        ) : (
-                          <>
-                            <TrendingUp className={`w-3 h-3 ${!stat.trendUp && 'rotate-180'}`} />
-                            {stat.trend}
-                          </>
-                        )}
-                      </div>
-                    </>
-                  );
-                  const cardClasses = `relative group overflow-hidden rounded-2xl border ${stat.border} bg-slate-900/40 backdrop-blur-sm p-6 transition-all duration-300 ${stat.href ? 'cursor-pointer hover:bg-slate-800/60' : ''}`;
-                  if (stat.href) {
-                    return (
-                      <Link href={stat.href} key={i} className={cardClasses}>
-                        <CardContent />
-                      </Link>
-                    );
-                  }
-                  return (
-                    <div key={i} className={cardClasses}>
-                      <CardContent />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {stats.map((stat, i) => (
+                  <Link href={stat.href} key={i} className={`group relative bg-white p-6 rounded-2xl border ${stat.border} shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1`}>
+                    <div className={`w-12 h-12 rounded-xl ${stat.bg} ${stat.color} flex items-center justify-center mb-4 transition-transform group-hover:scale-110`}>
+                        <stat.icon className="w-6 h-6" />
                     </div>
-                  );
-                })}
+                    <p className="text-sm font-medium text-slate-500 mb-1">{stat.title}</p>
+                    <div className="flex items-baseline gap-1">
+                        <span className="text-2xl font-bold text-slate-900">{stat.value}</span>
+                        <span className="text-xs text-slate-400 font-medium">{stat.total}</span>
+                    </div>
+                    <div className="mt-4 flex items-center text-xs font-semibold text-blue-600">
+                        {stat.trend} <ChevronRight className="ml-1 w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                    </div>
+                  </Link>
+                ))}
               </div>
 
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                 <div className="xl:col-span-2 rounded-2xl border border-slate-700/50 bg-slate-900/60 backdrop-blur-md overflow-hidden flex flex-col min-h-[400px]">
-                  <div className="p-6 border-b border-slate-700/50 flex items-center justify-between bg-slate-800/40">
-                    <h3 className="font-semibold text-lg text-white flex items-center gap-2">
-                      <FileText className="w-5 h-5 text-emerald-400" />
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                 <div className="xl:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
+                  <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                    <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                      <div className="w-2 h-6 bg-blue-600 rounded-full" />
                       สถานะการเบิกจ่ายล่าสุด
                     </h3>
-                    <Link href="/cards/request" className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1">
-                       ดูทั้งหมด <ChevronRight className="w-4 h-4" />
+                    <Link href="/cards/request" className="text-xs font-bold text-blue-600 hover:underline">
+                       ดูประวัติทั้งหมด
                     </Link>
                   </div>
+                  
                   <div className="overflow-x-auto flex-1">
-                    <table className="w-full text-left text-sm text-slate-400">
-                      <thead className="bg-slate-900/80 text-xs uppercase font-medium text-slate-300">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-slate-50/50 border-b border-slate-100 text-[11px] uppercase tracking-wider font-bold text-slate-400">
                         <tr>
                            <th className="px-6 py-4">สถานะ</th>
                            <th className="px-6 py-4">สถานที่ / ผู้เบิก</th>
                            <th className="px-6 py-4">รายการ</th>
-                           <th className="px-6 py-4 text-right">จัดการ</th>
+                           <th className="px-6 py-4 text-right">แอคชั่น</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-800/60">
-                        {recentRequests.length === 0 ? (
-                            <tr>
-                                <td colSpan={4} className="text-center py-10 text-slate-500">ไม่มีรายการเบิกจ่ายล่าสุด</td>
-                            </tr>
-                        ) : (
-                            recentRequests.map((item) => (
-                            <tr 
-                                key={item.id} 
-                                onClick={() => setSelectedRequest(item)}
-                                className="hover:bg-slate-800/30 transition-colors cursor-pointer group"
-                            >
+                      <tbody className="divide-y divide-slate-50">
+                        {recentRequests.map((item) => (
+                            <tr key={item.id} onClick={() => setSelectedRequest(item)} className="hover:bg-blue-50/30 transition-colors cursor-pointer group">
                                 <td className="px-6 py-4">
-                                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold border ${getStatusBadge(item.status)}`}>
-                                    {getStatusLabel(item.status)}
-                                </span>
+                                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold border ${getStatusBadge(item.status)}`}>
+                                      {getStatusLabel(item.status)}
+                                  </span>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <div className="text-white font-medium group-hover:text-blue-400 transition-colors">{item.requester}</div>
-                                    <div className="text-xs text-slate-500 flex items-center gap-1"><MapPin className="w-3 h-3" /> {item.location}</div>
+                                    <div className="text-slate-900 font-semibold group-hover:text-blue-600 transition-colors">{item.requester}</div>
+                                    <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5"><MapPin className="w-3 h-3" /> {item.location}</div>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <div className="text-white flex items-center gap-2">
-                                        <span className="text-lg">{getItemIcon(item.item)}</span>
+                                    <div className="text-slate-700 font-medium flex items-center gap-2">
+                                        <span className="bg-slate-100 w-7 h-7 flex items-center justify-center rounded-md text-sm">{getItemIcon(item.item)}</span>
                                         {item.item}
                                     </div>
-                                    <div className="text-xs text-slate-500">จำนวน: {item.quantity} {item.unit}</div>
+                                    <div className="text-[11px] text-slate-400 mt-1">จำนวน: {item.quantity} {item.unit}</div>
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                     <div className="flex items-center justify-end gap-2">
-                                        <button className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors">
+                                        <button className="p-1.5 hover:bg-blue-100 rounded-lg text-slate-400 hover:text-blue-600 transition-colors">
                                             <Eye className="w-4 h-4" />
                                         </button>
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); handleCancelRequest(item.id); }}
-                                            className="p-2 hover:bg-red-900/30 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
-                                            title="ยกเลิกรายการ"
-                                        >
+                                        <button onClick={(e) => { e.stopPropagation(); handleCancelRequest(item.id); }} className="p-1.5 hover:bg-rose-100 rounded-lg text-slate-400 hover:text-rose-600 transition-colors">
                                             <Trash2 className="w-4 h-4" />
                                         </button>
                                     </div>
                                 </td>
                             </tr>
-                            ))
-                        )}
+                        ))}
                       </tbody>
                     </table>
                   </div>
                  </div>
                  
-                 {/* ✅ ตรวจสอบ role - ถ้าเป็น ADMIN เท่านั้นจึงแสดง NotificationPanel */}
-                 {userRole && userRole === 'ADMIN' && <NotificationPanel />}
+                 {/* Notification Side */}
+                 <div className="space-y-6">
+                    {userRole === 'ADMIN' && (
+                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                            <NotificationPanel />
+                        </div>
+                    )}
+                 </div>
               </div>
             </div>
         </main>
       </div>
 
-      {/* --- DETAIL MODAL --- */}
+      {/* --- DETAIL MODAL (Styled) --- */}
       {selectedRequest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                <div className={`h-32 bg-gradient-to-br flex items-center justify-center relative ${selectedRequest.status === 'PENDING' ? 'from-yellow-600/20 to-orange-600/20' : selectedRequest.status === 'APPROVED' ? 'from-emerald-600/20 to-teal-600/20' : 'from-red-600/20 to-rose-600/20'}`}>
-                    <div className="text-6xl drop-shadow-lg filter">{getItemIcon(selectedRequest.item)}</div>
-                    <button onClick={() => setSelectedRequest(null)} className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 rounded-full text-white">
-                        <X className="w-5 h-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-[2px]">
+            <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className={`h-24 bg-gradient-to-r p-6 flex items-end justify-between ${selectedRequest.status === 'PENDING' ? 'from-amber-400 to-orange-500' : 'from-blue-600 to-indigo-700'}`}>
+                    <div className="text-4xl">{getItemIcon(selectedRequest.item)}</div>
+                    <button onClick={() => setSelectedRequest(null)} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white/20 hover:bg-white/40 rounded-full text-white transition-colors">
+                        <X className="w-4 h-4" />
                     </button>
-                    <div className="absolute bottom-4 left-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold border backdrop-blur-md ${getStatusBadge(selectedRequest.status)}`}>
-                            {getStatusLabel(selectedRequest.status)}
-                        </span>
-                    </div>
                 </div>
-                <div className="p-6 overflow-y-auto custom-scrollbar">
+                <div className="p-8">
                     <div className="mb-6">
-                        <h3 className="text-2xl font-bold text-white mb-1">{selectedRequest.item}</h3>
-                        <p className="text-slate-400 text-sm flex items-center gap-2">
-                            <span>รหัสคำร้อง: #{String(selectedRequest.id).slice(-6)}</span>
-                            <span>•</span>
-                            <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {selectedRequest.time}</span>
-                        </p>
+                        <div className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold border mb-3 ${getStatusBadge(selectedRequest.status)}`}>
+                            {getStatusLabel(selectedRequest.status)}
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-900">{selectedRequest.item}</h3>
+                        <p className="text-xs text-slate-400 mt-1 uppercase tracking-widest font-semibold">Order ID: #{String(selectedRequest.id).slice(-6)}</p>
                     </div>
-                    <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-6 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300">
-                                <Package className="w-5 h-5" />
+                    
+                    <div className="grid grid-cols-2 gap-4 mb-8">
+                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">จำนวนเบิก</p>
+                            <p className="text-lg font-bold text-blue-600">{selectedRequest.quantity} <span className="text-sm font-medium text-slate-500">{selectedRequest.unit}</span></p>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">เวลาที่แจ้ง</p>
+                            <p className="text-sm font-bold text-slate-700">{selectedRequest.time || '--:--'}</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+                                <MapPin className="w-4 h-4 text-blue-600" />
                             </div>
                             <div>
-                                <p className="text-xs text-slate-400">จำนวนที่ขอเบิก</p>
-                                <p className="text-white font-medium">{selectedRequest.quantity} {selectedRequest.unit}</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase">สถานที่รับของ</p>
+                                <p className="text-sm text-slate-700 font-semibold">{selectedRequest.location}</p>
+                                <p className="text-xs text-slate-500">{selectedRequest.requester}</p>
                             </div>
                         </div>
                     </div>
-                    <div className="mb-6">
-                        <h4 className="text-sm font-semibold text-slate-300 mb-4">สถานะการดำเนินการ</h4>
-                        <div className="relative pl-4 border-l-2 border-slate-700 space-y-6">
-                            <div className="relative">
-                                <div className="absolute -left-[21px] top-0 w-3 h-3 rounded-full bg-emerald-500 ring-4 ring-slate-900" />
-                                <p className="text-sm text-white font-medium">ส่งคำร้องขอแล้ว</p>
-                            </div>
-                            <div className="relative">
-                                <div className={`absolute -left-[21px] top-0 w-3 h-3 rounded-full ring-4 ring-slate-900 ${selectedRequest.status !== 'PENDING' ? 'bg-emerald-500' : 'bg-slate-600'}`} />
-                                <p className="text-sm text-white font-medium">เจ้าหน้าที่ตรวจสอบ</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div>
-                        <h4 className="text-sm font-semibold text-slate-300 mb-3">ข้อมูลผู้เบิก</h4>
-                        <div className="bg-slate-800/30 rounded-xl p-4 space-y-3">
-                            <div className="flex items-start gap-3">
-                                <MapPin className="w-5 h-5 text-blue-400" />
-                                <div>
-                                    <p className="text-sm text-white">{selectedRequest.requester}</p>
-                                    <p className="text-xs text-slate-500">{selectedRequest.location}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div className="p-4 border-t border-slate-800 bg-slate-800/50 flex gap-3">
-                    <button onClick={() => setSelectedRequest(null)} className="flex-1 py-3 rounded-xl bg-slate-700 text-white font-bold">ปิดหน้าต่าง</button>
+
+                    <button onClick={() => setSelectedRequest(null)} className="w-full mt-8 py-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-200 transition-all active:scale-[0.98]">
+                        ตกลง / ปิดหน้าต่าง
+                    </button>
                 </div>
             </div>
         </div>

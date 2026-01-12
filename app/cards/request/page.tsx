@@ -3,21 +3,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowLeft,
-  Search,
-  CheckCircle,
-  XCircle,
-  Clock,
-  MapPin,
-  Package,
-  X,
-  Check,
-  ChevronRight,
-  History,
-  Lock,
-  LogOut
+  ArrowLeft, Search, CheckCircle, XCircle, Clock, MapPin, 
+  Package, X, Check, ChevronRight, History, Lock, LogOut,
+  ShieldCheck, AlertCircle, Inbox
 } from 'lucide-react';
-import { useAuth } from '../../../lib/useAuth'; // ✅ ขึ้นไป 3 ชั้น
+import { useAuth } from '../../../lib/useAuth';
 
 export default function RequestPage() {
   const router = useRouter();
@@ -26,21 +16,14 @@ export default function RequestPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
-  // ✅ Redirect ถ้าไม่ logged in
   useEffect(() => {
-    if (!isLoading && !user) {
-      router.push('/login');
-    }
+    if (!isLoading && !user) router.push('/login');
   }, [user, isLoading, router]);
 
   useEffect(() => {
     const stored = localStorage.getItem('ems_requests');
     if (stored) {
-      try {
-        setRequests(JSON.parse(stored));
-      } catch (e) {
-        setRequests([]);
-      }
+      try { setRequests(JSON.parse(stored)); } catch (e) { setRequests([]); }
     }
   }, []);
 
@@ -67,27 +50,15 @@ export default function RequestPage() {
       groups[groupKey].items.push(req);
     });
 
-    return Object.values(groups).sort((a: any, b: any) => {
-      if (a.hasPending === b.hasPending) return 0;
-      return a.hasPending ? -1 : 1;
-    });
+    return Object.values(groups).sort((a: any, b: any) => (a.hasPending === b.hasPending ? 0 : a.hasPending ? -1 : 1));
   }, [requests, searchQuery]);
 
-  // ✅ ฟังก์ชันอัปเดต status (เช็ค role ก่อน)
   const updateStatus = (idList: any[], newStatus: string) => {
-    // ✅ เช็ค role - ถ้าไม่ใช่ admin ห้ามแก้ไข
     if (!isAdmin) {
-      alert('คุณไม่มีสิทธิ์ในการอนุมัติคำร้อง (Admin Only)');
+      alert('คุณไม่มีสิทธิ์ในการดำเนินการนี้ (Admin Only)');
       return;
     }
-
-    const updatedRequests = requests.map(req => {
-      if (idList.includes(req.id) && req.status === 'PENDING') {
-        return { ...req, status: newStatus };
-      }
-      return req;
-    });
-
+    const updatedRequests = requests.map(req => (idList.includes(req.id) && req.status === 'PENDING') ? { ...req, status: newStatus } : req);
     setRequests(updatedRequests);
     localStorage.setItem('ems_requests', JSON.stringify(updatedRequests));
 
@@ -110,152 +81,102 @@ export default function RequestPage() {
 
   const modalGroup = useMemo(() => {
     const group = groupedRequests.find((g: any) => g.id === selectedGroupId);
-    if (!group) return null;
-
-    return {
-      ...group,
-      pendingItems: group.items.filter((i: any) => i.status === 'PENDING'),
-      historyItems: group.items.filter((i: any) => i.status !== 'PENDING')
-    };
+    return group ? { ...group, pendingItems: group.items.filter((i: any) => i.status === 'PENDING'), historyItems: group.items.filter((i: any) => i.status !== 'PENDING') } : null;
   }, [groupedRequests, selectedGroupId]);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#0B1120] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
+  if (isLoading || !user) return <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-100 border-t-blue-600"></div></div>;
 
   return (
-    <div className="min-h-screen bg-[#0B1120] text-slate-100 font-sans p-8 md:p-12 lg:p-16">
-      <div className="relative z-10 max-w-6xl mx-auto">
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 font-sans pb-20">
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-0 right-0 w-[40%] h-[30%] bg-blue-50/50 rounded-full blur-[120px]" />
+      </div>
+
+      <div className="relative z-10 max-w-5xl mx-auto px-6 pt-10">
         
-        {/* === Header === */}
-        <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
-          <div className="flex items-center gap-4">
-            <button onClick={() => router.back()} className="p-2.5 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 transition-colors">
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+          <div className="flex items-center gap-5">
+            <button onClick={() => router.back()} className="p-3.5 rounded-2xl bg-white border border-slate-200 text-slate-500 hover:text-blue-600 transition-all shadow-sm">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <h1 className="text-xl font-bold text-white">รายการคำร้องขอ</h1>
-              {/* ✅ แสดง User Info */}
-              <p className="text-xs text-slate-400 flex items-center gap-2 mt-1">
-                <span className={`px-2 py-1 rounded-md text-[11px] font-bold ${isAdmin ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                  {isAdmin ? '👑 Admin' : '👤 Staff'}
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">รายการคำร้องเบิกจ่าย</h1>
+              <div className="flex items-center gap-3 mt-1">
+                <span className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${isAdmin ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-slate-200 text-slate-600'}`}>
+                  {isAdmin ? <ShieldCheck size={12} /> : <Lock size={12} />} {isAdmin ? 'Administrator' : 'Staff'}
                 </span>
-                <span>สวัสดี {user.name}</span>
-              </p>
+                <span className="text-xs font-bold text-slate-400">ผู้ใช้งาน: {user.name}</span>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1 max-w-xs hidden sm:block">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <div className="flex items-center gap-3">
+            <div className="relative hidden sm:block">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input 
                 type="text" 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="ค้นหาชื่อศูนย์..." 
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl py-2 pl-9 pr-4 text-sm outline-none transition-all focus:border-orange-500/50"
+                placeholder="ค้นหาศูนย์หรือรายการ..." 
+                className="bg-white border border-slate-200 rounded-xl py-2.5 pl-11 pr-4 text-sm outline-none w-64 focus:border-blue-400 transition-all"
+                value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-
-            {/* ✅ Logout Button */}
-            <button 
-              onClick={() => {
-                logout();
-                router.push('/login');
-              }}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-slate-800 transition-all"
-            >
-              <LogOut className="w-4 h-4" />
-              ออกจากระบบ
+            <button onClick={() => { logout(); router.push('/login'); }} className="p-2.5 rounded-xl bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 transition-colors shadow-sm">
+              <LogOut className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Mobile Search */}
-        <div className="relative mb-6 sm:hidden">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input 
-            type="text" 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="ค้นหาชื่อศูนย์..." 
-            className="w-full bg-slate-900 border border-slate-700 rounded-xl py-2 pl-9 pr-4 text-sm outline-none transition-all focus:border-orange-500/50"
-          />
-        </div>
-
-        {/* ✅ Info Box สำหรับ Staff */}
+        {/* Action Banner for Staff */}
         {!isAdmin && (
-          <div className="mb-6 p-4 bg-blue-900/30 border border-blue-500/30 rounded-xl flex items-start gap-3">
-            <Lock className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-medium text-blue-300">คุณเข้าสู่ระบบในฐานะเจ้าหน้าที่</p>
-              <p className="text-xs text-blue-400 mt-1">สามารถดูรายการคำร้องได้เท่านั้น ไม่สามารถทำการอนุมัติได้</p>
+          <div className="mb-8 p-5 bg-blue-600 rounded-[2rem] text-white shadow-xl shadow-blue-200 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md">
+                <Lock className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="font-black text-sm uppercase tracking-widest">Read-Only Mode</p>
+                <p className="text-xs opacity-80 font-bold">บัญชีเจ้าหน้าที่สามารถเรียกดูข้อมูลได้เท่านั้น ไม่สามารถอนุมัติรายการได้</p>
+              </div>
             </div>
           </div>
         )}
 
-        {/* === List ของแต่ละสถานที่ === */}
-        <div className="space-y-3">
+        {/* Requests List */}
+        <div className="space-y-4">
           {groupedRequests.length === 0 ? (
-            <div className="text-center py-20 text-slate-500 bg-slate-900/30 rounded-2xl border border-dashed border-slate-800">
-              <p>ไม่พบรายการคำร้อง</p>
+            <div className="text-center py-24 bg-white border-2 border-dashed border-slate-200 rounded-[3rem]">
+              <Inbox size={48} className="mx-auto text-slate-200 mb-4" />
+              <p className="text-slate-400 font-black uppercase tracking-widest">ไม่พบรายการคำร้องขอในขณะนี้</p>
             </div>
           ) : (
             groupedRequests.map((group: any) => (
-              <div 
-                key={group.id} 
-                className={`transition-all duration-300 border rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 ${
-                  group.hasPending 
-                  ? 'bg-slate-900/60 border-slate-800' 
-                  : 'bg-black/40 border-slate-900/50 opacity-60 grayscale-[0.2]'
-                }`}
-              >
-                <div className="flex items-start gap-4 flex-1">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 ${
-                    group.hasPending ? 'bg-orange-500/10 border-orange-500/20' : 'bg-slate-800 border-slate-700'
-                  }`}>
-                    <MapPin className={`w-5 h-5 ${group.hasPending ? 'text-orange-400' : 'text-slate-500'}`} />
+              <div key={group.id} className={`group relative flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 rounded-[2.5rem] bg-white border transition-all duration-300 ${group.hasPending ? 'border-amber-200 shadow-xl shadow-amber-900/5' : 'border-slate-100 opacity-70 grayscale-[0.5]'}`}>
+                <div className="flex items-center gap-5">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-colors ${group.hasPending ? 'bg-amber-50 text-amber-500' : 'bg-slate-50 text-slate-400'}`}>
+                    {group.hasPending ? <Clock className="w-7 h-7 animate-pulse" /> : <CheckCircle className="w-7 h-7" />}
                   </div>
                   <div>
-                    <h2 className={`font-bold truncate ${group.hasPending ? 'text-white' : 'text-slate-400'}`}>{group.name}</h2>
-                    <p className="text-[11px] text-slate-500 flex items-center gap-2">
-                      {group.hasPending ? `รออนุมัติ ${group.items.filter((i: any) => i.status === 'PENDING').length} รายการ` : 'ดำเนินการเสร็จสิ้นแล้ว'}
-                    </p>
+                    <h2 className="text-lg font-black text-slate-800 leading-tight group-hover:text-blue-600 transition-colors">{group.name}</h2>
+                    <div className="flex items-center gap-3 mt-1.5">
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter ${group.hasPending ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                        {group.hasPending ? `รอการตรวจสอบ ${group.items.filter((i: any) => i.status === 'PENDING').length} รายการ` : 'ดำเนินการเสร็จสิ้น'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 flex-wrap">
-                  <button 
-                    onClick={() => setSelectedGroupId(group.id)}
-                    className="text-xs text-blue-400 hover:bg-blue-500/10 px-4 py-2 rounded-lg transition-colors border border-blue-500/10 flex items-center gap-1"
-                  >
-                    {group.hasPending ? 'ดูรายละเอียด' : 'ดูประวัติการเบิก'} <ChevronRight className="w-3 h-3" />
+                <div className="flex items-center gap-3 pl-0 md:pl-0">
+                  <button onClick={() => setSelectedGroupId(group.id)} className="flex-1 md:flex-none px-6 py-3 rounded-2xl bg-slate-50 text-slate-600 font-black text-xs hover:bg-slate-100 transition-all border border-slate-100">
+                    ดูรายละเอียด
                   </button>
-                  
-                  {/* ✅ เช็ค role - ถ้า admin เท่านั้นจึงแสดงปุ่มอนุมัติ */}
                   {group.hasPending && isAdmin && (
                     <button 
                       onClick={() => updateStatus(group.items.map((i: any) => i.id), 'APPROVED')}
-                      className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors"
+                      className="flex-1 md:flex-none px-6 py-3 rounded-2xl bg-blue-600 text-white font-black text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2"
                     >
                       <Check className="w-4 h-4" /> อนุมัติทั้งหมด
                     </button>
-                  )}
-
-                  {/* ✅ แสดง message ถ้า staff */}
-                  {group.hasPending && !isAdmin && (
-                    <div className="text-[11px] text-slate-500 flex items-center gap-1 px-2">
-                      <Lock className="w-3 h-3" />
-                      Staff ไม่สามารถอนุมัติได้
-                    </div>
                   )}
                 </div>
               </div>
@@ -264,108 +185,88 @@ export default function RequestPage() {
         </div>
       </div>
 
-      {/* === Modal รายละเอียด === */}
+      {/* Modal Detail View */}
       {selectedGroupId && modalGroup && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#0F172A] border border-slate-800 rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
-            <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-              <div>
-                <h3 className="font-bold text-white text-base">{modalGroup.name}</h3>
-                <p className="text-[11px] text-slate-400">
-                  {isAdmin ? 'จัดการคำร้องเบิกจ่าย' : 'ดูรายละเอียดคำร้อง'}
-                </p>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-md">
+          <div className="bg-white rounded-[3rem] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-300">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-100"><MapPin size={24} /></div>
+                <div>
+                  <h3 className="font-black text-slate-900 text-xl tracking-tight">{modalGroup.name}</h3>
+                  <p className="text-xs font-bold text-slate-400 flex items-center gap-1.5"><Clock size={12} /> {modalGroup.hasPending ? 'มีรายการรอการอนุมัติ' : 'ประวัติการทำรายการ'}</p>
+                </div>
               </div>
-              <button onClick={() => setSelectedGroupId(null)} className="p-2 hover:bg-slate-800 rounded-full transition-colors">
-                <X className="w-5 h-5 text-slate-400" />
-              </button>
+              <button onClick={() => setSelectedGroupId(null)} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-100 rounded-xl hover:bg-rose-50 hover:text-rose-500 transition-colors shadow-sm"><X size={20} /></button>
             </div>
 
-            <div className="p-5 overflow-y-auto custom-scrollbar flex-1">
-              
-              {/* ✅ รายการที่รอการอนุมัติ - Admin สามารถอนุมัติได้ */}
+            <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-8">
+              {/* Pending Section */}
               {modalGroup.pendingItems.length > 0 && (
-                <div className="space-y-2 mb-6">
-                  {modalGroup.pendingItems.map((item: any) => (
-                    <div key={`pending-${item.id}`} className="flex items-center justify-between p-3.5 bg-slate-900/80 border border-slate-700 rounded-xl shadow-sm">
-                      <div className="flex items-center gap-4">
-                        <div className="text-xl">{item.image || '📦'}</div>
-                        <div>
-                          <p className="text-sm text-white font-medium">{item.item}</p>
-                          <p className="text-xs text-slate-500">จำนวน: <span className="text-orange-400 font-bold">{item.quantity}</span> {item.unit}</p>
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-1.5 h-6 bg-amber-500 rounded-full" />
+                    <h4 className="text-[11px] font-black uppercase text-amber-600 tracking-widest">รายการรออนุมัติ</h4>
+                  </div>
+                  <div className="grid gap-3">
+                    {modalGroup.pendingItems.map((item: any) => (
+                      <div key={item.id} className="flex items-center justify-between p-5 bg-amber-50/50 border border-amber-100 rounded-[1.8rem]">
+                        <div className="flex items-center gap-4">
+                          <span className="text-3xl">{item.image || '📦'}</span>
+                          <div>
+                            <p className="text-sm font-black text-slate-800">{item.item}</p>
+                            <p className="text-xs font-bold text-amber-600 uppercase tracking-tighter">จำนวน: {item.quantity.toLocaleString()} {item.unit}</p>
+                          </div>
                         </div>
+                        {isAdmin ? (
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => updateStatus([item.id], 'APPROVED')} className="w-10 h-10 flex items-center justify-center bg-emerald-500 text-white rounded-xl shadow-lg shadow-emerald-100 hover:bg-emerald-600 transition-all"><Check size={20} /></button>
+                            <button onClick={() => updateStatus([item.id], 'REJECTED')} className="w-10 h-10 flex items-center justify-center bg-rose-500 text-white rounded-xl shadow-lg shadow-rose-100 hover:bg-rose-600 transition-all"><X size={20} /></button>
+                          </div>
+                        ) : <Lock size={16} className="text-slate-300 mx-4" />}
                       </div>
-                      
-                      {/* ✅ เช็ค role - staff ไม่แสดงปุ่มอนุมัติ */}
-                      {isAdmin ? (
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={() => updateStatus([item.id], 'APPROVED')}
-                            className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded-lg border border-emerald-500/20"
-                            title="อนุมัติ"
-                          >
-                            <CheckCircle className="w-5 h-5" />
-                          </button>
-                          <button 
-                            onClick={() => updateStatus([item.id], 'REJECTED')}
-                            className="p-1.5 text-red-400 hover:bg-red-500/10 rounded-lg border border-red-500/20"
-                            title="ปฏิเสธ"
-                          >
-                            <XCircle className="w-5 h-5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1 text-[11px] text-slate-500 px-2 py-1 bg-slate-800/50 rounded-lg">
-                          <Lock className="w-3 h-3" />
-                          Read Only
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
 
-              {/* ประวัติการเบิก */}
+              {/* History Section */}
               {modalGroup.historyItems.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 py-2 px-1 border-b border-slate-800/50 mb-3">
-                    <History className="w-3.5 h-3.5 text-slate-500" />
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">ประวัติการเบิก</span>
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-1.5 h-6 bg-slate-300 rounded-full" />
+                    <h4 className="text-[11px] font-black uppercase text-slate-400 tracking-widest">ประวัติการเบิกจ่าย</h4>
                   </div>
-                  {modalGroup.historyItems.map((item: any) => (
-                    <div key={`history-${item.id}`} className="flex items-center justify-between p-3.5 bg-black/30 border border-slate-800/50 rounded-xl opacity-60 grayscale-[0.3]">
-                      <div className="flex items-center gap-4">
-                        <div className="text-xl grayscale">{item.image || '📦'}</div>
-                        <div>
-                          <p className="text-sm text-slate-400 font-medium">{item.item}</p>
-                          <p className="text-xs text-slate-500">จำนวน: {item.quantity} {item.unit}</p>
+                  <div className="grid gap-3 opacity-60">
+                    {modalGroup.historyItems.map((item: any) => (
+                      <div key={item.id} className="flex items-center justify-between p-5 bg-slate-50 border border-slate-100 rounded-[1.8rem]">
+                        <div className="flex items-center gap-4 grayscale">
+                          <span className="text-2xl">{item.image || '📦'}</span>
+                          <div>
+                            <p className="text-sm font-black text-slate-600">{item.item}</p>
+                            <p className="text-xs font-bold text-slate-400">จำนวน: {item.quantity} {item.unit}</p>
+                          </div>
                         </div>
+                        <span className={`text-[10px] font-black px-3 py-1 rounded-lg border uppercase tracking-wider ${item.status === 'APPROVED' ? 'text-emerald-600 border-emerald-100 bg-emerald-50' : 'text-rose-500 border-rose-100 bg-rose-50'}`}>
+                          {item.status === 'APPROVED' ? 'อนุมัติแล้ว' : 'ปฏิเสธ'}
+                        </span>
                       </div>
-                      <span className={`text-[10px] px-2 py-1 rounded border font-medium ${
-                        item.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'
-                      }`}>
-                        {item.status === 'APPROVED' ? 'อนุมัติแล้ว' : 'ปฏิเสธ'}
-                      </span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
 
-            <div className="p-5 border-t border-slate-800 bg-slate-900/50 flex gap-3">
-              <button 
-                onClick={() => setSelectedGroupId(null)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-all"
-              >
-                ปิดหน้าต่าง
-              </button>
+            <div className="p-8 bg-slate-50/80 border-t border-slate-100">
+              <button onClick={() => setSelectedGroupId(null)} className="w-full py-4 rounded-[1.5rem] bg-white border border-slate-200 text-slate-600 font-black text-sm hover:bg-slate-100 transition-all">ปิดหน้าต่าง</button>
             </div>
           </div>
         </div>
       )}
 
       <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 20px; }
       `}</style>
     </div>
   );
